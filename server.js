@@ -160,13 +160,13 @@ const notFound = new Map();   // tags que no existen: no se vuelven a pedir en 1
 const admitted = [];          // clanes nuevos admitidos en el último minuto
 
 // Antes de consultar un clan que no es el de casa: ¿existe? ¿cabe otro clan nuevo este minuto?
-function guardClan(tag) {
+function guardClan(tag, key = `war:${tag}`) {
   if (isHome(tag)) return;
   const now = Date.now();
-  stats.clans.set(tag, now);
-  const nf = notFound.get(tag);
-  if (nf && now - nf < 10 * 60e3) throw new ApiError(404, 'No hay ningún clan con ese tag, o el clan no está en una guerra ahora mismo.');
-  if (caches.has(`war:${tag}`)) return; // ya consultado: no es nuevo
+  stats.clans.set(key, now);
+  const nf = notFound.get(key);
+  if (nf && now - nf < 10 * 60e3) throw new ApiError(404, key.startsWith('player:') ? 'No hay ningún jugador con ese tag.' : 'No hay ningún clan con ese tag, o el clan no está en una guerra ahora mismo.');
+  if (caches.has(key)) return; // ya consultado: no es nuevo
   while (admitted.length && now - admitted[0] > 60e3) admitted.shift();
   if (admitted.length >= CONFIG.newClansPerMin) {
     stats.rejected += 1;
@@ -247,10 +247,29 @@ function raceClanTags(race) {
   return [...new Set([race.clan?.tag, ...(race.clans || []).map((c) => c.tag)].filter(Boolean))];
 }
 
+// Ficha de un jugador: perfil + últimas batallas + guerra de su clan actual (esta semana y las 10 últimas)
+const PlayerView = require('./lib/player-view');
+function getPlayer(tag) {
+  return cached(`player:${tag}`, Math.max(60e3, CONFIG.liveCacheMs), async () => {
+    const profile = await cr(`/players/%23${tag}`).catch((e) => {
+      if (e && e.status === 404) notFound.set(`player:${tag}`, Date.now());
+      if (e && e.status === 404) e.message = 'No hay ningún jugador con ese tag.';
+      throw e;
+    });
+    const ct = profile.clan && profile.clan.tag ? normalizeTag(profile.clan.tag) : null;
+    const [log, race, rlog] = await Promise.all([
+      cr(`/players/%23${tag}/battlelog`).catch(() => []),
+      ct ? cached(`race:${ct}`, CONFIG.liveCacheMs, () => cr(`/clans/%23${ct}/currentriverrace`)).catch(() => null) : null,
+      ct ? cached(`rlog:${ct}`, CONFIG.historyCacheMs, () => cr(`/clans/%23${ct}/riverracelog?limit=10`)).catch(() => null) : null,
+    ]);
+    return PlayerView.build(profile, log, race, rlog, { fetchedAt: new Date().toISOString() });
+  });
+}
+
 function getWar(tag) {
   return cached(`war:${tag}`, CONFIG.liveCacheMs, async () => {
     const race = await cr(`/clans/%23${tag}/currentriverrace`).catch((e) => {
-      if (e && e.status === 404 && !isHome(tag)) notFound.set(tag, Date.now()); // tag inexistente: recordarlo
+      if (e && e.status === 404 && !isHome(tag)) notFound.set(`war:${tag}`, Date.now()); // tag inexistente: recordarlo
       throw e;
     });
     if (CONFIG.trackClans.includes(tag)) record(tag, race);
@@ -530,8 +549,8 @@ const ACCESS_PAGE = `<!doctype html><html lang="es"><meta charset="utf-8"><meta 
 // Página de un clan: la tarjeta a pantalla completa, con buscador de clan y aviso de contenido de fans
 function clanPage(tag, home) {
   const card = fs.readFileSync(path.join(__dirname, 'deploy', 'dashboard-card.html'), 'utf8').replace(/^<!--[\s\S]*?-->\s*/, '');
-  const search = CONFIG.anyClan ? `<form class="pick" action="/c/" onsubmit="event.preventDefault();var t=this.t.value.toUpperCase().replace(/[^0-9A-Z]/g,'').replace(/O/g,'0');if(/^[0289PYLQGRJCUV]{3,12}$/.test(t))location.href='/c/'+t;else this.t.setCustomValidity('Tag no válido'),this.t.reportValidity();">
-  <label for="t">¿Otro clan?</label><input id="t" name="t" placeholder="#TAG del clan" autocomplete="off" autocapitalize="characters" spellcheck="false" oninput="this.setCustomValidity('')"><button>Ver</button>${CONFIG.clanTag && !home ? `<a href="/">Volver a #${CONFIG.clanTag}</a>` : ''}</form>` : '';
+  const search = CONFIG.anyClan ? `<form class="pick" action="/c/" onsubmit="event.preventDefault();var k=(event.submitter&&event.submitter.value)||'c';var t=this.t.value.toUpperCase().replace(/[^0-9A-Z]/g,'').replace(/O/g,'0');if(/^[0289PYLQGRJCUV]{3,12}$/.test(t))location.href='/'+k+'/'+t;else this.t.setCustomValidity('Tag no válido'),this.t.reportValidity();">
+  <label for="t">Buscar</label><input id="t" name="t" placeholder="#TAG de un clan o jugador" autocomplete="off" autocapitalize="characters" spellcheck="false" oninput="this.setCustomValidity('')"><button value="c">Clan</button><button value="p" class="alt">Jugador</button>${CONFIG.clanTag && !home ? `<a href="/">Volver a #${CONFIG.clanTag}</a>` : ''}</form>` : '';
   return `<!doctype html>
 <html lang="es"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -541,6 +560,7 @@ function clanPage(tag, home) {
 .pick label{color:#9bb0a0;font-size:12.5px}
 .pick input{font:inherit;font-size:16px;flex:1;min-width:9em;max-width:16em;background:#101a14;color:#f5fbf6;border:1px solid #1f2e24;border-radius:999px;padding:7px 14px}
 .pick button{font:inherit;font-weight:700;background:#00ff41;color:#021004;border:0;border-radius:999px;padding:8px 16px;cursor:pointer}
+.pick button.alt{background:none;color:#00ff41;border:1px solid #00ff41}
 .pick a{color:#9bb0a0;font-size:12.5px;margin-left:auto}
 .fan{max-width:1100px;color:#6e8474;font-size:11.5px;text-align:center;margin:0}
 .pick input:focus-visible,.pick button:focus-visible{outline:2px solid #00ff41;outline-offset:2px}</style>
@@ -570,6 +590,12 @@ async function route(req, res) {
   if (p === '/monitor') return serveStatic(res, '/index.html');
   if (p === '/monitor/') return send(res, 301, 'text/plain; charset=utf-8', '', { Location: '/monitor' });
   if (p === '/' || p === '/clan' || p === '/clan/') return send(res, 200, 'text/html; charset=utf-8', clanPage(CONFIG.clanTag, true), { 'Cache-Control': 'no-store' });
+  const mp = p.match(/^\/p\/([^/]+)\/?$/); // ficha de un jugador: /p/J9LGQQGGJ
+  if (mp) {
+    const t = normalizeTag(decodeURIComponent(mp[1]));
+    if (!TAG_RE.test(t) || (CONFIG.clanTag && !CONFIG.anyClan)) return send(res, 302, 'text/plain', '', { Location: '/' });
+    return send(res, 200, 'text/html; charset=utf-8', fs.readFileSync(path.join(__dirname, 'public', 'player.html')), { 'Cache-Control': 'no-store' });
+  }
   const mc = p.match(/^\/c\/([^/]+)\/?$/); // página de cualquier clan: /c/LVR980LQ
   if (mc) {
     const t = normalizeTag(decodeURIComponent(mc[1]));
@@ -656,6 +682,14 @@ async function route(req, res) {
   if (m) {
     const tag = tagFrom(req, res, m[1]);
     return tag && json(req, res, 200, await getWar(tag));
+  }
+  m = p.match(/^\/api\/player\/([^/]+)\/?$/);
+  if (m) {
+    const tag = normalizeTag(decodeURIComponent(m[1]));
+    if (!TAG_RE.test(tag)) return json(req, res, 400, { error: 'Tag de jugador no válido.' });
+    if (CONFIG.clanTag && !CONFIG.anyClan) return json(req, res, 403, { error: 'Este servidor solo consulta su clan.' });
+    guardClan(tag, `player:${tag}`); // mismo tope de consultas nuevas y memoria de tags inexistentes
+    return json(req, res, 200, await getPlayer(tag));
   }
   m = p.match(/^\/api\/history\/([^/]+)\/?$/);
   if (m) {

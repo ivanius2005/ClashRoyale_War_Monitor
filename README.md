@@ -419,3 +419,10 @@ Protecciones para no agotar la API de Clash Royale ni la Raspberry:
 - **Uso**: `curl http://127.0.0.1:3055/api/stats` (solo desde la propia máquina).
 
 Contenido de fans, no afiliado ni respaldado por Supercell.
+
+## Ficha de jugador
+
+`/p/TAG` (o el botón «Jugador» del buscador) muestra de cualquier jugador: nivel, trofeos y Path of Legend,
+su mazo actual con evoluciones y héroes, las 15 últimas batallas con su porcentaje de victorias,
+su actividad en la guerra de su clan actual (esta semana y las 10 últimas) y el reparto de niveles de sus cartas.
+API: `GET /api/player/TAG`. Las consultas de jugadores nuevos cuentan para el mismo tope por minuto que los clanes.

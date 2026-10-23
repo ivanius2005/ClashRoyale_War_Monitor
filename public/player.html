@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#050805"><title>Jugador · Guerra de clanes</title>
+<style>
+:root{--bg:#050805;--p:#0a110d;--p2:#101a14;--p3:#16241c;--l:#1f2e24;--t:#dde9e0;--w:#f5fbf6;--m:#9bb0a0;--d:#6e8474;--g:#00ff41;--gold:#f5c542;--r:#ff5c5c;--b:#5ab0ff;color-scheme:dark}
+*{box-sizing:border-box}
+html{background:var(--bg)}
+body{margin:0;padding:max(16px,env(safe-area-inset-top)) 14px max(28px,env(safe-area-inset-bottom));font:14.5px/1.55 ui-monospace,"JetBrains Mono",SFMono-Regular,Menlo,Consolas,monospace;color:var(--t)}
+.wrap{max-width:1100px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+a{color:var(--g)}
+.pick{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.pick label{color:var(--m);font-size:12.5px}
+.pick input{font:inherit;font-size:16px;flex:1;min-width:9em;max-width:16em;background:var(--p2);color:var(--w);border:1px solid var(--l);border-radius:999px;padding:7px 14px}
+.pick button{font:inherit;font-weight:700;background:var(--g);color:#021004;border:0;border-radius:999px;padding:8px 16px;cursor:pointer}
+.pick button.alt{background:none;color:var(--g);border:1px solid var(--g)}
+.pick a{color:var(--m);font-size:12.5px;margin-left:auto}
+:focus-visible{outline:2px solid var(--g);outline-offset:2px}
+.card{background:var(--p);border:1px solid var(--l);border-radius:16px;padding:18px 20px}
+h1{margin:0;font-size:28px;line-height:1.15;color:var(--w);letter-spacing:-.02em;overflow-wrap:anywhere}
+h2{margin:0 0 12px;font-size:15px;color:var(--w)}
+.sub{color:var(--m);font-size:13px;margin-top:4px}
+.sub b{color:var(--t)}
+.hero{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:18px;align-items:start}
+.lv{display:grid;place-items:center;width:64px;height:64px;border-radius:14px;background:var(--p3);border:1px solid var(--l);text-align:center}
+.lv b{font-size:24px;color:var(--w);line-height:1}
+.lv span{font-size:10px;color:var(--m);text-transform:uppercase;letter-spacing:.08em}
+.deck{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:8px;margin-top:16px}
+.cd{position:relative;background:var(--p2);border:1px solid var(--l);border-radius:10px;padding:4px 4px 6px;text-align:center}
+.cd img{width:100%;aspect-ratio:5/6;object-fit:contain;display:block}
+.cd .n{font-size:11.5px;color:var(--w);font-weight:700}
+.tagb{position:absolute;top:4px;left:4px;font-size:9.5px;font-weight:700;padding:1px 6px;border-radius:999px;letter-spacing:.04em}
+.tagb.evo{background:#b46bff;color:#12001f}
+.tagb.hero{background:var(--gold);color:#1d1400}
+.deckmeta{display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:10px;color:var(--m);font-size:12.5px}
+.deckmeta b{color:var(--t)}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px}
+.tile{background:var(--p);border:1px solid var(--l);border-radius:12px;padding:12px 14px}
+.tile .k{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--m)}
+.tile .v{font-size:22px;font-weight:700;color:var(--w);margin-top:2px}
+.tile .d{font-size:12px;color:var(--m)}
+.good{color:var(--g)!important}.warn{color:var(--gold)!important}.bad{color:var(--r)!important}
+.grid2{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:16px}
+.bl{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.bl li{display:grid;grid-template-columns:76px minmax(0,1fr) auto;gap:10px;align-items:center;background:var(--p2);border:1px solid var(--l);border-radius:10px;padding:7px 10px}
+.res{font-size:11.5px;font-weight:700;text-align:center;border-radius:999px;padding:2px 0}
+.res.win{background:rgba(0,255,65,.14);color:var(--g)}.res.loss{background:rgba(255,92,92,.14);color:var(--r)}.res.draw{background:var(--p3);color:var(--m)}
+.bl .who{min-width:0}
+.bl .who b{color:var(--w);font-size:13px}
+.bl .who span{display:block;color:var(--m);font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bl .sc{text-align:right;font-size:13px;color:var(--w);font-weight:700;white-space:nowrap}
+.bl .sc small{display:block;color:var(--d);font-weight:400;font-size:11px}
+.weeks{display:grid;grid-template-columns:repeat(10,minmax(0,1fr));gap:5px;align-items:end;height:110px;margin-top:6px}
+.wk{display:flex;flex-direction:column;justify-content:flex-end;align-items:center;height:100%;gap:3px}
+.wk i{display:block;width:100%;border-radius:5px 5px 2px 2px;background:var(--g)}
+.wk i.part{background:var(--gold)}.wk i.none{background:var(--r);height:3px!important}.wk i.out{background:var(--l);height:3px!important}
+.wk span{font-size:9.5px;color:var(--d)}
+.wk b{font-size:10.5px;color:var(--t)}
+.lvbars{display:flex;flex-direction:column;gap:5px}
+.lvb{display:grid;grid-template-columns:52px minmax(0,1fr) 30px;white-space:nowrap;gap:8px;align-items:center;font-size:12.5px}
+.lvb .bar{height:10px;border-radius:999px;background:var(--p3);overflow:hidden}
+.lvb .bar i{display:block;height:100%;background:var(--g);border-radius:999px}
+.icons{display:grid;grid-template-columns:repeat(auto-fill,minmax(58px,1fr));gap:8px}
+.ic{text-align:center;font-size:10.5px;color:var(--m)}
+.ic img{width:100%;aspect-ratio:5/6;object-fit:contain;display:block;background:var(--p2);border:1px solid var(--l);border-radius:8px}
+.ic.dk img{border-color:var(--g)}
+.muted{color:var(--m);font-size:12.5px}
+.msg{padding:40px 20px;text-align:center;color:var(--m)}
+.msg.err{color:var(--r)}
+.fan{color:var(--d);font-size:11.5px;text-align:center;margin:8px 0 0}
+@media (max-width:820px){.grid2{grid-template-columns:1fr}.deck{grid-template-columns:repeat(4,minmax(0,1fr))}.hero{grid-template-columns:1fr}.lv{display:none}}
+@media (prefers-reduced-motion:no-preference){.card,.tile{animation:in .35s ease both}@keyframes in{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <form class="pick" id="pick">
+    <label for="t">Buscar</label>
+    <input id="t" name="t" placeholder="#TAG de un clan o jugador" autocomplete="off" autocapitalize="characters" spellcheck="false">
+    <button value="c">Clan</button><button value="p" class="alt">Jugador</button>
+    <a href="/">← Panel inicial</a>
+  </form>
+  <main id="out" aria-live="polite"><div class="card msg">Cargando jugador…</div></main>
+  <p class="fan">Contenido de fans, no afiliado ni respaldado por Supercell. Datos de la API oficial de Clash Royale.</p>
+</div>
+<script>
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
+  var fmt = function (n) { return n == null ? '—' : Number(n).toLocaleString('es-ES'); };
+  var dec = function (n, d) { return n == null ? '—' : Number(n).toLocaleString('es-ES', { minimumFractionDigits: d, maximumFractionDigits: d }); };
+  var pct = function (x) { return x == null ? '—' : Math.round(x * 100) + ' %'; };
+  var norm = function (v) { return String(v || '').toUpperCase().replace(/[^0-9A-Z]/g, '').replace(/O/g, '0'); };
+  var TAG_RE = /^[0289PYLQGRJCUV]{3,12}$/;
+
+  $('pick').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var k = (e.submitter && e.submitter.value) || 'p';
+    var t = norm($('t').value);
+    if (TAG_RE.test(t)) location.href = '/' + k + '/' + t;
+    else { $('t').setCustomValidity('Tag no válido'); $('t').reportValidity(); }
+  });
+  $('t').addEventListener('input', function () { $('t').setCustomValidity(''); });
+
+  var tag = norm(decodeURIComponent(location.pathname.split('/')[2] || ''));
+  if (!TAG_RE.test(tag)) { $('out').innerHTML = '<div class="card msg err">Tag de jugador no válido.</div>'; return; }
+
+  function ago(iso) {
+    if (!iso) return '';
+    var m = Math.round((Date.now() - Date.parse(iso)) / 60000);
+    if (m < 60) return 'hace ' + Math.max(1, m) + ' min';
+    var h = Math.round(m / 60); if (h < 48) return 'hace ' + h + ' h';
+    return 'hace ' + Math.round(h / 24) + ' días';
+  }
+  var img = function (src, alt) { return src ? '<img src="' + esc(src) + '" alt="' + esc(alt) + '" loading="lazy" referrerpolicy="no-referrer">' : ''; };
+
+  function render(v) {
+    document.title = v.name + ' · Guerra de clanes';
+    var c = v.cards, b = v.battles, w = v.war, a = w.activity || {};
+    var actCls = { 'muy-activo': 'good', activo: 'good', poco: 'warn', no: 'bad' }[a.level] || '';
+    var wrCls = b.winRate == null ? '' : b.winRate >= 0.55 ? 'good' : b.winRate >= 0.45 ? 'warn' : 'bad';
+    var pol = v.pathOfLegend && v.pathOfLegend.current;
+    var polTxt = pol && (pol.trophies || pol.league > 1) ? ' · Path of Legend liga ' + pol.league + (pol.trophies ? ' (' + fmt(pol.trophies) + ')' : '') : '';
+    var clan = v.clan ? '<a href="/c/' + esc(norm(v.clan.tag)) + '">' + esc(v.clan.name) + '</a>' + (v.clan.role ? ' · ' + esc(v.clan.role) : '') : 'sin clan';
+
+    var deck = c.deck.map(function (d) {
+      return '<div class="cd">' + (d.hero ? '<span class="tagb hero">HÉROE</span>' : d.evo ? '<span class="tagb evo">EVO</span>' : '') +
+        img(d.icon, d.name) + '<div class="n">Nv. ' + d.level + '</div></div>';
+    }).join('');
+    var tower = c.tower.filter(function (t) { return t.inUse; })[0];
+
+    var battles = b.list.map(function (x) {
+      var r = { win: 'Victoria', loss: 'Derrota', draw: 'Empate' }[x.result];
+      var tc = x.trophyChange ? (x.trophyChange > 0 ? '+' : '') + x.trophyChange : '';
+      return '<li><span class="res ' + x.result + '">' + r + '</span>' +
+        '<span class="who"><b>' + esc(x.label) + '</b><span>vs ' + esc(x.opponent || '—') + (x.opponentClan ? ' · ' + esc(x.opponentClan) : '') + '</span></span>' +
+        '<span class="sc">' + x.crowns + '–' + x.oppCrowns + (tc ? ' <span class="' + (x.trophyChange > 0 ? 'good' : 'bad') + '">' + tc + '</span>' : '') + '<small>' + ago(x.time) + '</small></span></li>';
+    }).join('');
+
+    var maxDecks = 16;
+    var weeks = w.weeks.slice().reverse().map(function (x) {
+      var h = x.present ? Math.max(3, Math.round((x.decksUsed / maxDecks) * 82)) : 3;
+      var cls = !x.present ? 'out' : x.decksUsed === 0 ? 'none' : x.decksUsed >= 14 ? '' : 'part';
+      return '<div class="wk" title="' + esc(x.label) + ': ' + (x.present ? x.decksUsed + ' mazos · ' + fmt(x.fame) + ' medallas' : 'no estaba en el clan') + '">' +
+        '<b>' + (x.present ? x.decksUsed : '·') + '</b><i class="' + cls + '" style="height:' + h + 'px"></i><span>' + esc(x.label.replace('T', '').replace('·S', '·')) + '</span></div>';
+    }).join('');
+
+    var maxN = Math.max.apply(null, c.byLevel.map(function (x) { return x.n; }).concat([1]));
+    var lvbars = c.byLevel.map(function (x) {
+      return '<div class="lvb"><span>Nv. ' + x.level + '</span><span class="bar"><i style="width:' + Math.round((x.n / maxN) * 100) + '%"></i></span><span>' + x.n + '</span></div>';
+    }).join('');
+    var icons = function (list) {
+      return list.length ? '<div class="icons">' + list.map(function (x) { return '<div class="ic' + (x.inDeck ? ' dk' : '') + '" title="' + esc(x.name) + ' · nivel ' + x.level + (x.inDeck ? ' · en su mazo' : '') + '">' + img(x.icon, x.name) + esc(x.name) + '</div>'; }).join('') + '</div>' : '<p class="muted">Ninguno desbloqueado.</p>';
+    };
+
+    $('out').innerHTML =
+      '<section class="card"><div class="hero"><div>' +
+        '<h1>' + esc(v.name) + '</h1>' +
+        '<div class="sub">' + esc(v.tag) + ' · ' + clan + '</div>' +
+        '<div class="sub"><b>' + fmt(v.trophies) + '</b> trofeos (máx. ' + fmt(v.bestTrophies) + ')' + (v.arena ? ' · ' + esc(v.arena) : '') + polTxt + '</div>' +
+      '</div><div class="lv" title="Nivel de experiencia"><span>Nivel</span><b>' + fmt(v.expLevel) + '</b></div></div>' +
+      '<div class="deck" aria-label="Mazo actual">' + deck + '</div>' +
+      '<div class="deckmeta"><span>Mazo actual · elixir medio <b>' + dec(c.deckElixir, 1) + '</b></span>' + (tower ? '<span>Torre: <b>' + esc(tower.name) + '</b> (nv. ' + tower.level + ')</span>' : '') + (c.favourite ? '<span>Carta favorita: <b>' + esc(c.favourite) + '</b></span>' : '') + '</div></section>' +
+
+      '<div class="tiles">' +
+        '<div class="tile"><div class="k">Últimas ' + b.list.length + ' batallas</div><div class="v ' + wrCls + '">' + pct(b.winRate) + '</div><div class="d">' + b.wins + ' victorias · ' + b.losses + ' derrotas' + (b.draws ? ' · ' + b.draws + ' empates' : '') + '</div></div>' +
+        '<div class="tile"><div class="k">Guerra</div><div class="v ' + actCls + '" style="font-size:17px">' + esc(a.label || '—') + '</div><div class="d">' + (a.avgDecks != null ? dec(a.avgDecks, 1) + ' mazos/semana en ' + a.weeksSeen + ' semanas' : (b.warInLog ? b.warInLog + ' batallas de guerra recientes' : 'sin datos de guerra')) + '</div></div>' +
+        '<div class="tile"><div class="k">Torre del rey</div><div class="v">' + fmt(v.kingTowerLevel) + '</div><div class="d">cartas al máximo: ' + c.maxed + ' de ' + c.total + '</div></div>' +
+        '<div class="tile"><div class="k">Nivel medio de cartas</div><div class="v">' + dec(c.avgLevel, 1) + '</div><div class="d">de ' + c.top + ' como máximo</div></div>' +
+        '<div class="tile"><div class="k">Evoluciones</div><div class="v">' + c.evolutions.length + '<span class="muted"> / ' + c.evoSlots + '</span></div><div class="d">desbloqueadas</div></div>' +
+        '<div class="tile"><div class="k">Héroes</div><div class="v">' + c.heroes.length + '<span class="muted"> / ' + c.heroSlots + '</span></div><div class="d">desbloqueados</div></div>' +
+      '</div>' +
+
+      '<div class="grid2">' +
+        '<section class="card"><h2>Últimas batallas</h2>' + (battles ? '<ul class="bl">' + battles + '</ul>' : '<p class="muted">No hay batallas recientes.</p>') +
+          (b.byType.length ? '<p class="muted" style="margin:10px 0 0">' + b.byType.map(function (t) { return esc(t.label) + ': ' + t.wins + '/' + t.n; }).join(' · ') + '</p>' : '') + '</section>' +
+        '<div style="display:flex;flex-direction:column;gap:16px">' +
+          '<section class="card"><h2>Guerra en su clan</h2>' +
+            (w.thisWeek ? '<p class="muted" style="margin:0 0 6px">Esta semana: <b style="color:var(--w)">' + w.thisWeek.decksUsed + '</b> mazos · ' + fmt(w.thisWeek.fame) + ' medallas · hoy ' + w.thisWeek.decksUsedToday + ' de 4</p>' : '') +
+            (w.weeks.length ? '<div class="weeks" aria-label="Mazos de guerra por semana">' + weeks + '</div><p class="muted" style="margin:8px 0 0">Mazos jugados de 16 por semana, de la más antigua a la más reciente.' + (a.avgFame != null ? ' Media: ' + fmt(Math.round(a.avgFame)) + ' medallas.' : '') + '</p>' : '<p class="muted">' + esc(a.label || 'Sin historial de guerra.') + '</p>') +
+          '</section>' +
+          '<section class="card"><h2>Niveles de cartas</h2><div class="lvbars">' + lvbars + '</div></section>' +
+        '</div>' +
+      '</div>' +
+
+      '<section class="card"><h2>Héroes desbloqueados</h2>' + icons(c.heroes) + '</section>' +
+      '<section class="card"><h2>Evoluciones desbloqueadas</h2>' + icons(c.evolutions) + '</section>' +
+      '<p class="muted" style="text-align:center;margin:0">Datos de ' + ago(v.fetchedAt) + '. La API guarda sus ' + b.available + ' últimas batallas; la guerra es la de su clan actual.</p>';
+  }
+
+  fetch('/api/player/' + tag).then(function (r) {
+    return r.json().then(function (d) { if (!r.ok) throw new Error(d.error || ('Error ' + r.status)); return d; });
+  }).then(render).catch(function (e) {
+    $('out').innerHTML = '<div class="card msg err">' + esc(e.message) + '</div>';
+  });
+})();
+</script>
+</body></html>

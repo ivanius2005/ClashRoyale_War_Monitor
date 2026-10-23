@@ -1,1 +1,0 @@
-# ClashRoyale_War_Monitor

@@ -32,7 +32,9 @@
     // (14 en pie = 435 - 59 = 376, comprobado con RoyaleAPI)
     defenseAward: [59, 53, 47, 43, 41, 37, 31, 29, 23, 19, 17, 13, 11, 7, 5],
     minPerDeck: 100,
-    maxPerDeck: 250,
+    maxPerDeck: 250,       // media por mazo como mucho (un duelo 2-0 son 250 por mazo)
+    maxPlayerDay: 900,     // máximo de un jugador en un día: duelo 2-0 (500) + 2 batallas (400)
+    duelMinDecks: 3,       // el duelo solo se empieza con 3 mazos o más
   };
   const MODEL = {
     priorDays: 8,          // suavizado: 8 días (2 semanas) con la media del clan
@@ -197,6 +199,26 @@
   // clan: salida de CWCalc.analyzeClan · rel: salida de reliability() o null
   // weekRate: medallas por mazo de la semana (weekPerDeck). A media tarde, la media de
   // solo hoy sale de pocos mazos y engaña (los primeros en jugar no son un clan medio).
+  // Lo máximo que puede sacar un jugador con los mazos que le quedan hoy.
+  // El duelo (al mejor de 3) solo se puede empezar con 3 mazos o más: con 4 → duelo 2-0 (500) + 2 batallas (400) = 900;
+  // con 3 → 500 + 200 = 700; con 2 o menos, solo batallas (200 cada una).
+  function maxForLeft(left) {
+    const n = Math.max(0, Math.min(4, Math.floor(left || 0)));
+    return n >= 3 ? 2 * 250 + (n - 2) * 200 : n * 200;
+  }
+  // Máximo de un clan: la suma de lo de cada jugador pendiente, sin pasar del cupo de mazos que le queda al clan
+  function maxDay(pending, cap) {
+    let room = Math.max(0, cap || 0);
+    let total = 0;
+    for (const p of [...(pending || [])].sort((a, b) => b.left - a.left)) {
+      if (room <= 0) break;
+      const d = Math.min(p.left, room);
+      total += maxForLeft(d);
+      room -= d;
+    }
+    return total;
+  }
+
   function todayInputs(clan, rel, colosseum, weekRate) {
     const perDeck = weekRate != null ? weekRate
       : clan.usedTotal >= 8 && clan.avg != null ? clan.avg
@@ -213,7 +235,7 @@
       pending,
       cap: clan.remaining,
       expDecks,
-      max: clan.dayPoints + clan.remaining * RULES.maxPerDeck,
+      max: clan.dayPoints + maxDay(clan.pending, clan.remaining),
     };
   }
 
@@ -222,14 +244,17 @@
     const shock = MODEL.dayRiskShock * R.gauss();
     const form = Math.max(0.5, 1 + MODEL.dayFormCv * R.gauss());
     let decks = 0;
+    let top = 0; // lo máximo posible con los mazos que juega cada uno (duelo solo con 3 o más)
     for (const p of t.pending) {
       const risk = clamp(p.risk + shock, 0, 1);
-      decks += R.rnd() < risk ? Math.floor(R.rnd() * p.left) : p.left;
+      const d = R.rnd() < risk ? Math.floor(R.rnd() * p.left) : p.left;
+      decks += d;
+      top += maxForLeft(d);
     }
-    decks = Math.min(decks, t.cap);
+    if (decks > t.cap) { top *= t.cap / decks; decks = t.cap; }
     if (!decks) return 0;
     const add = decks * t.perDeck * form + Math.sqrt(decks) * MODEL.deckSd * R.gauss();
-    return clamp(add, decks * RULES.minPerDeck, decks * RULES.maxPerDeck);
+    return clamp(add, decks * RULES.minPerDeck, Math.max(decks * RULES.minPerDeck, top));
   }
 
   // Probabilidades de cómo acaba el día. En coliseo se ordena por el total semanal.
@@ -642,7 +667,7 @@
   }
 
   return {
-    RULES, MODEL, KICK, DEFAULT_DECK_COEF, recencyWeight, mergeRuns, parseCrDate, splitWeek, kickReport, daysPlayed, prepareHistory, reliability, expectedDecks, weekPerDeck,
+    RULES, MODEL, KICK, DEFAULT_DECK_COEF, recencyWeight, mergeRuns, maxForLeft, maxDay, parseCrDate, splitWeek, kickReport, daysPlayed, prepareHistory, reliability, expectedDecks, weekPerDeck,
     defenseBonusFor, todayInputs, runToday, weekProgress, buildInputs, run,
   };
 });

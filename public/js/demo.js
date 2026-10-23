@@ -43,7 +43,17 @@
     const tag = () => '#' + Array.from({ length: 8 }, () => A[Math.floor(rnd() * A.length)]).join('');
     const syl = ['Ka', 'ro', 'Lu', 'mi', 'Xa', 'vi', 'Neo', 'Zar', 'Pa', 'co', 'Ra', 'yo', 'Tor', 'in', 'Vex', 'Ul', 'ri', 'ko', 'Sa', 'nt'];
     const nick = () => { let n = ''; const k = 2 + Math.floor(rnd() * 2); for (let i = 0; i < k; i++) n += syl[Math.floor(rnd() * syl.length)]; return rnd() < 0.3 ? n + Math.floor(rnd() * 99) : n; };
-    const deckMedals = (i) => (rnd() < skill[i] ? (rnd() < 0.6 ? 250 : 200) : 100);
+    // Un día de un jugador con n mazos, como en el juego: si le quedan 3 o más, primero un duelo al mejor de 3
+    // (250 por mazo ganado, 100 por perdido); el resto, batallas (200 ganada, 100 perdida). Máximo: 900.
+    const dayMedals = (i, n) => {
+      let left = n; let m = 0;
+      if (left >= 3) {
+        let w = 0; let l = 0;
+        while (w < 2 && l < 2) { if (rnd() < skill[i]) { w++; m += 250; } else { l++; m += 100; } left--; }
+      }
+      for (; left > 0; left--) m += rnd() < skill[i] ? 200 : 100;
+      return m;
+    };
 
     // Jugadores: cada uno con su fiabilidad (prob. de jugar sus 4 mazos un día)
     // y las semanas que lleva en el clan
@@ -78,7 +88,7 @@
         const already = rnd() < 0.7; // ya ha pasado por la guerra hoy
         const used = already ? playDay(m) : 0;
         let p = 0;
-        for (let d = 0; d < used; d++) p += deckMedals(cd.i);
+        p += dayMedals(cd.i, used);
         pts += p;
         participants.push({ tag: m.tag, name: m.name, fame: p, repairPoints: 0, boatAttacks: 0, decksUsed: used, decksUsedToday: used });
       }
@@ -92,7 +102,7 @@
     const AWARD = [59, 53, 47, 43, 41, 37, 31, 29, 23, 19, 17, 13, 11, 7, 5];
     const MOVES = [3000, 1800, 1000, 600, 400];
     const maxDefs = custom ? NAMES.map(() => 11 + Math.floor(rnd() * 5)) : [15, 15, 14, 13, 15];
-    const fullDay = (cd) => cd.members.reduce((s, m) => { let p = 0; for (let d = playDay(m); d > 0; d--) p += deckMedals(cd.i); return s + p; }, 0);
+    const fullDay = (cd) => cd.members.reduce((s, m) => { return s + dayMedals(cd.i, playDay(m)); }, 0);
     function playedDays(firstIndex, days) {
       const intact = clanDefs.map((cd) => Array.from({ length: maxDefs[cd.i] }, () => true));
       const progress = clanDefs.map(() => 0);
@@ -155,7 +165,7 @@
           for (let d = 0; d < 4; d++) {
             const n = playDay(m);
             let f = 0;
-            for (let k = 0; k < n; k++) f += deckMedals(cd.i);
+            f += dayMedals(cd.i, n);
             days.push(n); fame.push(f);
           }
           players.push({ tag: m.tag, days, fame });

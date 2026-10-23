@@ -489,7 +489,7 @@ function dayTiles(c, vals, now, t, training) {
   return `<div class="tiles t4">${[
     tile({ icon: 'cards', k: 'Mazos jugados', v: pct(usable ? used / usable : 0), d: `${used} de ${usable} posibles, quedan ${c.remaining}`, extra: meter }),
     tile({ icon: 'target', k: 'Final esperado', v: training ? '—' : t ? `${fmt(vals.exp)}${inc(vals.exp)}` : '…', d: training ? 'no aplica hoy' : expTxt, tone: 'amber' }),
-    tile({ icon: 'medal', k: 'Si juegan y ganan todo', v: training ? '—' : `${fmt(vals.max)}${inc(vals.max)}`, d: training ? 'no aplica hoy' : `${c.remaining} mazos a ${WIN} medallas` }),
+    tile({ icon: 'medal', k: 'Si juegan y ganan todo', v: training ? '—' : `${fmt(vals.max)}${inc(vals.max)}`, d: training ? 'no aplica hoy' : `${c.remaining} mazos · máx. 900 por jugador (duelo solo con 3+ mazos)` }),
     tile({ icon: 'medal', k: 'Si juegan y pierden todo', v: training ? '—' : `${fmt(vals.min)}${inc(vals.min)}`, d: training ? 'no aplica hoy' : `${c.remaining} mazos a ${LOSS} medallas` }),
   ].join('')}</div>`;
 }

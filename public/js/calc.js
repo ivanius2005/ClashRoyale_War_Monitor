@@ -10,8 +10,12 @@
   'use strict';
 
   const RULES = {
-    WIN: 250,        // medallas por mazo en un duelo ganado (el máximo posible)
+    WIN: 250,        // medallas por mazo en un duelo ganado
+    BATTLE_WIN: 200, // medallas por una batalla ganada
     LOSS: 100,       // medallas por mazo perdido en batalla o duelo
+    DUEL_MIN_DECKS: 3, // hacen falta 3 mazos o más para empezar un duelo
+    MAX_PLAYER_DAY: 900, // máximo de un jugador en un día (duelo 2-0 + 2 batallas)
+    CAP_CLAN_DAY: 45000, // máximo de un clan en un día (50 jugadores × 900)
     DECKS: 4,        // mazos por jugador y día
     CAP_DECKS: 200,  // mazos máximos por clan y día
     CAP_PLAYERS: 50, // jugadores distintos por clan y día
@@ -77,12 +81,32 @@
     };
   }
 
-  function range(now, remaining, avg, training) {
+  // Lo máximo que puede sacar un jugador con los mazos que le quedan hoy.
+  // El duelo (al mejor de 3) solo se puede empezar con 3 mazos o más: con 4 → duelo 2-0 (500) + 2 batallas (400) = 900;
+  // con 3 → 500 + 200 = 700; con 2 o menos, solo batallas (200 cada una).
+  function maxForLeft(left) {
+    const n = Math.max(0, Math.min(4, Math.floor(left || 0)));
+    return n >= 3 ? 2 * 250 + (n - 2) * 200 : n * 200;
+  }
+  // Máximo de un clan: la suma de lo de cada jugador pendiente, sin pasar del cupo de mazos que le queda al clan
+  function maxDay(pending, cap) {
+    let room = Math.max(0, cap || 0);
+    let total = 0;
+    for (const p of [...(pending || [])].sort((a, b) => b.left - a.left)) {
+      if (room <= 0) break;
+      const d = Math.min(p.left, room);
+      total += maxForLeft(d);
+      room -= d;
+    }
+    return total;
+  }
+
+  function range(now, remaining, avg, training, maxAdd) {
     if (training) return { now: 0, min: 0, max: 0, proj: 0 };
     return {
       now,
       min: now + remaining * RULES.LOSS,
-      max: now + remaining * RULES.WIN,
+      max: now + (maxAdd == null ? remaining * RULES.MAX_PLAYER_DAY / RULES.DECKS : maxAdd),
       proj: avg == null ? null : now + remaining * avg,
     };
   }
@@ -102,8 +126,9 @@
     for (const c of clans) {
       c.avgUsed = c.avg != null ? c.avg : raceAvg;
       c.avgSource = c.avg != null ? 'propia' : raceAvg != null ? 'carrera' : null;
-      c.day = range(c.dayPoints, c.remaining, c.avgUsed, training);
-      c.week = colosseum ? range(c.fame, c.remaining, c.avgUsed, false) : null;
+      const maxAdd = maxDay(c.pending, c.remaining);
+      c.day = range(c.dayPoints, c.remaining, c.avgUsed, training, maxAdd);
+      c.week = colosseum ? range(c.fame, c.remaining, c.avgUsed, false, maxAdd) : null;
     }
 
     const d = (((race.periodIndex || 0) % 7) + 7) % 7;
@@ -125,5 +150,5 @@
     return null;
   }
 
-  return { RULES, isFinished, analyzeClan, buildModel, versus };
+  return { RULES, maxForLeft, maxDay, isFinished, analyzeClan, buildModel, versus };
 });

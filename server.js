@@ -511,6 +511,19 @@ async function recordAll() {
 
 /* ---------- ficheros estáticos ---------- */
 
+// Versión de los archivos del monitor: una huella de su contenido. Cambia sola con cada actualización,
+// así nadie se queda con el JavaScript viejo que Cloudflare guarda en el navegador hasta 4 horas.
+let assetVersion = null;
+function getAssetVersion() {
+  if (assetVersion) return assetVersion;
+  const h = require('crypto').createHash('sha1');
+  for (const dir of ['js', 'css']) {
+    const d = path.join(PUBLIC_DIR, dir);
+    for (const f of fs.readdirSync(d).sort()) h.update(f).update(fs.readFileSync(path.join(d, f)));
+  }
+  return (assetVersion = h.digest('hex').slice(0, 10));
+}
+
 function serveStatic(res, urlPath) {
   let rel;
   try { rel = decodeURIComponent(urlPath); } catch { return send(res, 400, 'text/plain; charset=utf-8', 'Ruta no válida'); }
@@ -519,6 +532,10 @@ function serveStatic(res, urlPath) {
   if (!file.startsWith(PUBLIC_DIR + path.sep)) return send(res, 403, 'text/plain; charset=utf-8', 'Prohibido');
   fs.readFile(file, (err, buf) => {
     if (err) return send(res, 404, 'text/plain; charset=utf-8', 'No encontrado');
+    if (path.basename(file) === 'index.html') {
+      const html = buf.toString('utf8').replace(/(\.(?:js|css))\?v=[0-9a-z]+/g, `$1?v=${getAssetVersion()}`);
+      return send(res, 200, 'text/html; charset=utf-8', html, { 'Cache-Control': 'no-store' });
+    }
     send(res, 200, MIME[path.extname(file).toLowerCase()] || 'application/octet-stream', buf, { 'Cache-Control': 'no-cache' });
   });
 }

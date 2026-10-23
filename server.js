@@ -154,7 +154,7 @@ function rateLimited(ip) {
 /* ---------- API de Clash Royale ---------- */
 
 // Contadores para vigilar el uso (GET /api/stats, solo desde la propia máquina)
-const stats = { since: Date.now(), api: 0, apiErrors: 0, api429: 0, cacheHits: 0, cacheMisses: 0, rejected: 0, clans: new Map() };
+const stats = { since: Date.now(), api: 0, apiErrors: 0, api429: 0, staleServed: 0, cacheHits: 0, cacheMisses: 0, rejected: 0, clans: new Map() };
 const isHome = (tag) => !!CONFIG.clanTag && tag === CONFIG.clanTag;
 const notFound = new Map();   // tags que no existen: no se vuelven a pedir en 10 min
 const admitted = [];          // clanes nuevos admitidos en el último minuto
@@ -175,7 +175,7 @@ function guardClan(tag) {
   admitted.push(now);
 }
 
-async function cr(pathname) {
+async function cr(pathname, retry = true) {
   stats.api += 1;
   let res;
   try {
@@ -184,9 +184,12 @@ async function cr(pathname) {
       signal: AbortSignal.timeout(15_000),
     });
   } catch {
-    throw new ApiError(504, 'No se pudo contactar con la API de Clash Royale (sin conexión o tiempo agotado).');
+    if (retry) { await new Promise((r) => setTimeout(r, 800)); return cr(pathname, false); }
+    throw new ApiError(503, 'No se pudo contactar con la API de Clash Royale (sin conexión o tiempo agotado). Prueba en un minuto.');
   }
   if (res.ok) return res.json();
+  // Fallo puntual del proxy o de la API (5xx): un reintento antes de rendirse
+  if (res.status >= 500 && retry) { await new Promise((r) => setTimeout(r, 800)); return cr(pathname, false); }
 
   let reason = '';
   try { reason = (await res.json()).reason || ''; } catch { /* sin cuerpo */ }
@@ -200,26 +203,42 @@ async function cr(pathname) {
   stats.apiErrors += 1;
   if (res.status === 429) stats.api429 += 1;
   const message = known[res.status] || `La API respondió ${res.status}${reason ? ` (${reason})` : ''}.`;
-  // Un 403 de la API es un problema de configuración de este servidor, no del usuario
+  // Un 403 de la API es un problema de configuración de este servidor, no del usuario.
+  // Los 5xx de la API o del proxy nunca se reenvían tal cual: Cloudflare tomaría un 520/525 por un fallo de este servidor.
+  if (res.status >= 500 && res.status !== 503) {
+    throw new ApiError(503, `La API de Clash Royale (o el proxy de RoyaleAPI) está fallando ahora mismo (error ${res.status}). Prueba en un minuto.`);
+  }
   throw new ApiError(res.status === 403 ? 502 : res.status, message);
 }
 
 // Caché con deduplicación: si 20 personas piden lo mismo a la vez, solo sale 1 petición
 const caches = new Map();
+// Último dato bueno de cada clave: si la API falla (5xx o sin conexión), se sirve esto (hasta 6 h) en vez de un error
+const lastGood = new Map();
+const STALE_MAX = 6 * 3600e3;
 function cached(key, ttl, fn) {
   const hit = caches.get(key);
   if (hit && Date.now() - hit.at < ttl) { stats.cacheHits += 1; return hit.promise; }
   stats.cacheMisses += 1;
-  const promise = fn();
+  const promise = fn().then(
+    (v) => { lastGood.set(key, { at: Date.now(), v }); return v; },
+    (e) => {
+      const old = lastGood.get(key);
+      if (e && e.status >= 500 && old && Date.now() - old.at < STALE_MAX) { stats.staleServed += 1; return old.v; }
+      throw e;
+    },
+  );
   caches.set(key, { at: Date.now(), promise });
   promise.catch(() => caches.delete(key));
   if (caches.size > 500) caches.delete(caches.keys().next().value);
+  if (lastGood.size > 500) lastGood.delete(lastGood.keys().next().value);
   return promise;
 }
 
 setInterval(() => {
   const now = Date.now();
   for (const [k, v] of caches) if (now - v.at > 30 * 60e3) caches.delete(k);
+  for (const [k, v] of lastGood) if (now - v.at > STALE_MAX) lastGood.delete(k);
   for (const [k, t] of notFound) if (now - t > 10 * 60e3) notFound.delete(k);
   for (const [k, t] of stats.clans) if (now - t > 3600e3) stats.clans.delete(k);
 }, 5 * 60e3).unref();
@@ -564,7 +583,7 @@ async function route(req, res) {
     const hour = Date.now() - 3600e3;
     return json(req, res, 200, {
       desde: new Date(stats.since).toISOString(), peticionesApi: stats.api, erroresApi: stats.apiErrors, errores429: stats.api429,
-      cache: { aciertos: stats.cacheHits, fallos: stats.cacheMisses }, clanesRechazados: stats.rejected,
+      cache: { aciertos: stats.cacheHits, fallos: stats.cacheMisses, datosDeReserva: stats.staleServed }, clanesRechazados: stats.rejected,
       clanesUltimaHora: [...stats.clans.values()].filter((t) => t > hour).length, enCache: caches.size, tagsInexistentes: notFound.size,
     });
   }

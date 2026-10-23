@@ -1,0 +1,324 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Monitor de guerra de clanes · Clash Royale</title>
+<meta name="description" content="Sigue la guerra de clanes de Clash Royale en directo, mira qué jugadores suelen dejarse mazos y simula tus opciones de ganar con el historial de las últimas semanas.">
+<meta name="theme-color" content="#050705">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23050705'/%3E%3Cpath d='M15 6v13H8Z' fill='%2300ff41'/%3E%3Cpath d='M17 9l6 10h-6Z' fill='%2300ff41' opacity='.8'/%3E%3Cpath d='M5 21h22l-3 5H8Z' fill='%2300ff41'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Lilita+One&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/styles.css?v=20261023">
+</head>
+<body>
+
+<!-- Iconos (dibujos propios, sin recursos del juego) -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-boat" viewBox="0 0 24 24"><path d="M11 3v12H5.5Z"/><path d="M13.5 6 18.5 15h-5Z"/><path d="M3 17.5h18l-2.4 3.2a1.5 1.5 0 0 1-1.2.6H6.6a1.5 1.5 0 0 1-1.2-.6Z"/></symbol>
+  <symbol id="i-medal" viewBox="0 0 24 24"><circle cx="12" cy="15" r="5.5"/><path d="M8.5 3 12 9.5 15.5 3"/><path d="M12 12.8v4.4"/></symbol>
+  <symbol id="i-cards" viewBox="0 0 24 24"><rect x="3.5" y="6.5" width="10.5" height="14" rx="2"/><path d="M8.5 3.5h9a2 2 0 0 1 2 2v11.5"/></symbol>
+  <symbol id="i-crown" viewBox="0 0 24 24"><path d="M4 19h16"/><path d="M5 15.5 3.5 7l5 4L12 4.5 15.5 11l5-4-1.5 8.5Z"/></symbol>
+  <symbol id="i-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2.2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></symbol>
+  <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8"/><path d="M18.5 14.8c1.7.8 2.7 2.6 3 5.2"/></symbol>
+  <symbol id="i-dice" viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="17" height="17" rx="4"/><circle cx="8.5" cy="8.5" r=".6"/><circle cx="12" cy="12" r=".6"/><circle cx="15.5" cy="15.5" r=".6"/></symbol>
+  <symbol id="i-flag" viewBox="0 0 24 24"><path d="M5 21V4"/><path d="M5 4h12l-2.5 4.5L17 13H5"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 4 2.8 19.5h18.4Z"/><path d="M12 10v4.5M12 17.3v.2"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8.5" y="8.5" width="12" height="12" rx="2"/><path d="M15.5 8.5V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v7.5a2 2 0 0 0 2 2h2.5"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 11.5a8 8 0 1 1-2.4-5.7"/><path d="M20 4v5h-5"/></symbol>
+  <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 19h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-swords" viewBox="0 0 24 24"><path d="M4 4l9 9M4 4h4l8 8M4 4v4l8 8M14.5 17.5l3-3M16 19l3-3M18.5 18.5 21 21"/><path d="M20 4l-6.5 6.5M20 4h-4M20 4v4M9.5 14.5l-3 3M8 19l-3-3M5.5 18.5 3 21"/></symbol>
+    <symbol id="i-crown" viewBox="0 0 24 24"><path d="M4 17.5 3 7l5 4 4-6 4 6 5-4-1 10.5z"/><path d="M5 20.5h14"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></symbol>
+  <symbol id="i-chart" viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 5 5"/></symbol>
+  <symbol id="i-userx" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="m16.5 8.5 5 5M21.5 8.5l-5 5"/></symbol>
+  <symbol id="i-swap" viewBox="0 0 24 24"><path d="M4 8h14l-3.5-3.5M20 16H6l3.5 3.5"/></symbol>
+</svg>
+
+<div class="wrap">
+
+  <header class="top">
+    <div class="brand">
+      <span class="mark">IVN<b>_</b>05</span>
+      <span class="app"><svg class="ic"><use href="#i-swords"/></svg>Guerra de clanes</span>
+      <a class="btn back" href="/" aria-label="Volver al panel inicial">← Panel inicial</a>
+    </div>
+    <div class="live" aria-live="polite"><span class="led" id="led"></span><span id="liveText">sin datos</span></div>
+  </header>
+
+  <form class="query" id="query" autocomplete="off" role="search">
+    <label class="q" for="tag">Busca cualquier clan</label>
+    <div class="qrow">
+      <div class="qfield">
+        <svg class="ic"><use href="#i-search"/></svg>
+        <input id="tag" name="q" type="search" spellcheck="false" maxlength="40" placeholder="Nombre del clan o #TAG" aria-describedby="tagHelp" aria-controls="results">
+      </div>
+      <button class="go" id="go" type="submit">Buscar</button>
+    </div>
+    <div class="qopts">
+      <label id="autoWrap"><input type="checkbox" id="auto" checked> Actualizar cada minuto</label>
+      <span id="tagHelp">Escribe al menos 3 letras del nombre, o el tag con # (lo tienes en el perfil del clan).</span>
+    </div>
+    <div class="results" id="results" role="listbox" aria-label="Clanes encontrados" hidden></div>
+    <div class="recent" id="recent" hidden></div>
+  </form>
+
+  <div class="demobar" id="demoBar" hidden>
+    <div class="seg" role="group" aria-label="Momento de la semana">
+      <button type="button" data-demo="entrenamiento" aria-pressed="false">Antes de empezar</button>
+      <button type="button" data-demo="guerra" aria-pressed="false">Día de batalla</button>
+      <button type="button" data-demo="coliseo" aria-pressed="false">Coliseo</button>
+    </div>
+    <button type="button" class="btn" id="demoNew"><svg class="ic"><use href="#i-refresh"/></svg>Otra carrera</button>
+  </div>
+
+  <div class="msg" id="msg" role="status" hidden></div>
+  <div class="chips" id="chips"></div>
+
+  <section class="intro" id="intro">
+    <p class="lead">¿Cómo va tu clan en la guerra?</p>
+    <p>Búscalo por su nombre o su tag y verás la carrera de barcos en directo, quién falta por jugar, a quién conviene expulsar y qué opciones tenéis de ganar el día y la semana.</p>
+    <p><button type="button" class="link" data-demo="guerra">Probar con una demo</button><button type="button" class="link" data-demo="coliseo">Demo de semana de coliseo</button></p>
+  </section>
+
+  <nav class="tabs" id="tabs" role="tablist" hidden>
+    <button type="button" role="tab" id="tab-live" aria-controls="panel-live" aria-selected="true" data-tab="live"><svg class="ic"><use href="#i-swords"/></svg><span class="tl-long">Hoy en directo</span><span class="tl-short">Hoy</span></button>
+    <button type="button" role="tab" id="tab-players" aria-controls="panel-players" aria-selected="false" data-tab="players" tabindex="-1"><svg class="ic"><use href="#i-users"/></svg>Jugadores</button>
+    <button type="button" role="tab" id="tab-kick" aria-controls="panel-kick" aria-selected="false" data-tab="kick" tabindex="-1"><svg class="ic"><use href="#i-userx"/></svg><span class="tl-long">Expulsiones</span><span class="tl-short">Expulsar</span></button>
+    <button type="button" role="tab" id="tab-sim" aria-controls="panel-sim" aria-selected="false" data-tab="sim" tabindex="-1"><svg class="ic"><use href="#i-dice"/></svg><span class="tl-long">Simulador de la semana</span><span class="tl-short">Simular</span></button>
+  </nav>
+
+  <!-- ================= HOY EN DIRECTO ================= -->
+  <div id="panel-live" role="tabpanel" aria-labelledby="tab-live" hidden>
+
+    <section class="fig" id="figNews" aria-labelledby="newsTitle" hidden>
+      <div class="fhead"><span class="fno">FIG. 00</span><h2 id="newsTitle">Novedades</h2>
+        <div class="aside"><a class="btn-pdf" id="pdfNow" href="api/report.pdf" target="_blank" rel="noopener" hidden>
+          <svg class="ic"><use href="#i-download"/></svg>Exportar PDF</a></div></div>
+      <div class="news-grid">
+        <article class="news-card" id="newsReport" hidden>
+          <h3><svg class="ic"><use href="#i-clock"/></svg>Informe de las <span id="reportHour">08:00</span></h3>
+          <p class="news-sub" id="reportWhen"></p>
+          <table class="cmp" id="reportCmp"></table>
+          <p class="news-label" id="reportChangesLabel" hidden>Desde el informe anterior</p>
+          <ul class="changes" id="reportChanges"></ul>
+          <a class="news-pdf" id="reportPdf" href="api/report/latest.pdf" target="_blank" rel="noopener" hidden>PDF de este informe →</a>
+        </article>
+        <article class="news-card" id="newsSeen">
+          <h3><svg class="ic"><use href="#i-refresh"/></svg>Desde tu última visita</h3>
+          <p class="news-sub" id="seenWhen"></p>
+          <ul class="changes" id="seenChanges"></ul>
+        </article>
+      </div>
+    </section>
+
+    <section class="fig" aria-labelledby="sumTitle">
+      <div class="fhead"><span class="fno">FIG. 01</span><h2 id="sumTitle">La carrera</h2></div>
+      <p class="fsub" hidden id="riverSub"></p>
+      <p class="sumtext" id="sumText"></p>
+      <div class="river" id="river"></div>
+      <div class="legend rlegend" aria-hidden="true" id="riverLegend"></div>
+      <div class="tiles" id="sumKpis"></div>
+    </section>
+
+    <section class="fig" id="figPoints" aria-labelledby="ptsTitle">
+      <div class="fhead"><span class="fno">FIG. 02</span><h2 id="ptsTitle">Puntos de avance de hoy</h2></div>
+      <p class="fsub" hidden id="ptsSub">Lo que avanzará cada barco al cerrar el día: los puntos de su puesto por medallas más los de sus defensas en pie. Debajo de cada cifra, la probabilidad de quedar en ese puesto.</p>
+      <div class="tablewrap"><table class="ptable" id="ptsTable"></table></div>
+      <details class="howto"><summary>Supuestos del cálculo</summary><ul class="assume" id="ptsNotes"></ul></details>
+    </section>
+
+    <section class="fig" aria-labelledby="raceTitle">
+      <div class="fhead">
+        <span class="fno">FIG. 03</span>
+        <h2 id="raceTitle">Medallas de hoy</h2>
+        <div class="aside">
+          <div class="seg" id="viewSeg" hidden role="group" aria-label="Qué medallas comparar">
+            <button type="button" data-view="day" aria-pressed="true">Hoy</button>
+            <button type="button" data-view="week">Semana</button>
+          </div>
+        </div>
+      </div>
+      <p class="fsub" hidden id="raceSub">El orden de hoy decide cuánto avanza cada barco al cerrar el día. Toca un clan para ver su detalle.</p>
+      <div class="grid-row axis" aria-hidden="true"><span></span><span></span><div class="ticks" id="ticks"></div><span class="h">Medallas</span><span class="h" id="probHead">Gana el día</span></div>
+      <div class="race" id="race"></div>
+      <div class="legend" aria-hidden="true">
+        <span><i class="sw now"></i>Medallas conseguidas (en el color de cada clan)</span>
+        <span><i class="sw proj"></i>Final esperado</span>
+        <span><i class="sw range"></i>Máximo si juegan y ganan todo</span>
+      </div>
+      <p class="note" id="raceNote" hidden></p>
+    </section>
+
+    <section class="fig" aria-labelledby="dName">
+      <div class="fhead">
+        <span class="fno">FIG. 04</span>
+        <div class="dtitle"><span id="dShield"></span><h2 id="dName"></h2><span class="tag" id="dTag"></span><span class="chip green" id="dOwn" hidden>Tu clan</span></div>
+        <div class="aside"><button type="button" class="btn" id="dSwitch" hidden><svg class="ic"><use href="#i-swap"/></svg>Analizar este clan</button></div>
+      </div>
+      <p class="fsub" hidden>Detalle del clan que toques en la carrera.</p>
+      <div class="hero" id="dHero">
+        <div class="big" id="dNow">0</div>
+        <div class="cap"><strong id="dCapTitle">medallas hoy</strong><span id="dAvg"></span></div>
+        <div class="side" id="dSide"></div>
+      </div>
+      <div id="dDay"></div>
+      <div id="dWeek"></div>
+      <details class="howto"><summary>Notas</summary><ul class="notes" id="dNotes"></ul></details>
+    </section>
+
+    <section class="fig" aria-labelledby="pTitle">
+      <div class="fhead">
+        <span class="fno">FIG. 05</span>
+        <h2 id="pTitle">Faltan por jugar</h2>
+        <div class="aside"><button type="button" class="btn" id="copy"><svg class="ic"><use href="#i-copy"/></svg><span>Copiar para el chat</span></button></div>
+      </div>
+      <p class="fsub" hidden>Primero, quien más suele dejarse mazos según sus últimas semanas: son a los que conviene avisar.</p>
+      <p class="psum" id="pSum"></p>
+      <div class="cardlegend" aria-hidden="true"><span><i class="pip used"></i>Mazo jugado</span><span><i class="pip"></i>Pendiente hoy</span></div>
+      <ul class="plist" id="pList"></ul>
+      <div class="legend" aria-hidden="true">
+        <span><span class="pips"><i class="pip used"></i><i class="pip"></i></span>mazo jugado / pendiente</span>
+        <span><i class="risk r-lo">bajo</i>menos del 15 %</span>
+        <span><i class="risk r-mid">medio</i>15–40 %</span>
+        <span><i class="risk r-hi">alto</i>más del 40 %</span>
+      </div>
+    </section>
+  </div>
+
+  <!-- ================= JUGADORES ================= -->
+  <div id="panel-players" role="tabpanel" aria-labelledby="tab-players" hidden>
+    <section class="fig" aria-labelledby="plTitle">
+      <div class="fhead"><span class="fno">FIG. 06</span><h2 id="plTitle">Compromiso de los jugadores</h2>
+        <div class="aside"><a class="btn pdf" id="plPdf" href="api/players.pdf" target="_blank" rel="noopener" hidden><svg class="ic"><use href="#i-download"/></svg><span>Informe de jugadores (PDF)</span></a></div></div>
+      <p class="fsub" hidden id="plSub">Cómo ha jugado cada miembro en las últimas semanas de guerra. Cada semana tiene 16 mazos: 4 al día durante 4 días.</p>
+      <div class="pctl">
+        <label for="plClan" class="csub">Clan</label>
+        <select id="plClan"></select>
+      </div>
+      <div class="tiles t4" id="plKpis"></div>
+      <div class="tablewrap"><table class="dtable" id="plTable"></table></div>
+      <ul class="assume">
+        <li><b>Mazos jugados:</b> la parte de sus mazos de guerra que jugó en las semanas en que estaba en el clan.</li>
+        <li><b>Días con fallos:</b> días de guerra en los que se dejó algún mazo.</li>
+        <li><b>Riesgo hoy:</b> la misma cifra suavizada con la media del clan, para que dos o tres semanas de datos no den 0 % ni 100 %. Es la probabilidad que usa la web para prever los mazos que se jugarán.</li>
+      </ul>
+    </section>
+  </div>
+
+  <!-- ================= EXPULSIONES ================= -->
+  <div id="panel-kick" role="tabpanel" aria-labelledby="tab-kick" hidden>
+    <section class="fig" aria-labelledby="kTitle">
+      <div class="fhead">
+        <span class="fno">FIG. 07</span>
+        <h2 id="kTitle">Candidatos a expulsión</h2>
+        <div class="aside"><a class="btn pdf" id="kPdf" href="api/players.pdf" target="_blank" rel="noopener" hidden><svg class="ic"><use href="#i-download"/></svg><span>Informe PDF</span></a><button type="button" class="btn" id="kCopy"><svg class="ic"><use href="#i-copy"/></svg><span>Copiar la lista</span></button></div>
+      </div>
+      <p class="fsub" hidden>Una nota para cada miembro según los mazos que juega cada día y las medallas que consigue. Cuanto más baja, más motivos para expulsarle.</p>
+      <form class="kctl" id="kForm">
+        <label for="kClan">Clan <select id="kClan"></select></label>
+        <label>Semanas a tener en cuenta
+          <span class="rangebox"><input type="range" id="kWeeks" min="1" max="10" step="1" value="10"><output id="kWeeksOut" for="kWeeks">10</output></span>
+        </label>
+        <label>Peso de las medallas
+          <span class="rangebox"><input type="range" id="kMedal" min="0" max="3" step="0.25" value="1"><output id="kMedalOut" for="kMedal">×1</output></span>
+        </label>
+        <label>Media objetivo por semana <span class="rangebox"><input type="number" id="kTarget" min="0" max="6000" step="50" value="2400" inputmode="numeric"></span>
+        </label>
+        <label>Nota mínima para quedarse
+          <span class="rangebox"><input type="range" id="kThr" min="-2" max="1.5" step="0.1" value="-0.5"><output id="kThrOut" for="kThr">−0,5</output></span>
+        </label>
+      </form>
+      <details class="kcoef">
+        <summary>Coeficiente de cada día según los mazos jugados</summary>
+        <div class="coefs" id="kCoefs">
+          <label>0 mazos<input type="number" step="0.5" data-k="0"></label>
+          <label>1 mazo<input type="number" step="0.5" data-k="1"></label>
+          <label>2 mazos<input type="number" step="0.5" data-k="2"></label>
+          <label>3 mazos<input type="number" step="0.5" data-k="3"></label>
+          <label>4 mazos<input type="number" step="0.5" data-k="4"></label>
+          <button type="button" class="btn" id="kReset">Restablecer</button>
+        </div>
+      </details>
+      <p class="formula" id="kFormula"></p>
+      <div class="tiles t4" id="kTiles"></div>
+      <div class="legend" aria-hidden="true" id="kLegend"></div>
+      <div class="klist" id="kList"></div>
+      <details class="howto"><summary>Notas del cálculo</summary><ul class="assume" id="kNotes"></ul></details>
+    </section>
+  </div>
+
+  <!-- ================= SIMULADOR ================= -->
+  <div id="panel-sim" role="tabpanel" aria-labelledby="tab-sim" hidden>
+    <section class="fig" aria-labelledby="simTitle">
+      <div class="fhead"><span class="fno">FIG. 08</span><h2 id="simTitle">Simulador de la semana</h2></div>
+      <p class="fsub" hidden>Jugamos la semana miles de veces con el historial de cada clan y contamos cuántas veces acaba cada uno en cada puesto.</p>
+      <form class="simctl" id="simForm">
+        <p class="simfixed"><b>500.000</b> simulaciones · variabilidad diaria <b>3,2 %</b> (la real de Furia Ibérica en sus 10 últimas semanas) · las semanas recientes pesan más (1 · 0,9 … 0,1)</p>
+        <label id="simTypeBox">Tipo de semana
+          <select id="simType">
+            <option value="auto">Carrera normal</option>
+            <option value="colosseum">Coliseo</option>
+          </select>
+        </label>
+        <button class="go" id="simRun" type="submit"><svg class="ic"><use href="#i-dice"/></svg>Simular</button>
+      </form>
+      <div class="simprog" id="simProg" role="progressbar" aria-label="Progreso de la simulación" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" hidden><div class="bar"><i id="simProgBar"></i></div><span id="simProgTxt">Simulando… 0 %</span></div>
+      <p class="simstate" id="simState"></p>
+      <div class="msg" id="simMsg" role="status" hidden></div>
+
+      <div class="simout" id="simOut" hidden>
+        <div class="simhero">
+          <svg class="ic crown"><use href="#i-crown"/></svg>
+          <div class="big" id="simBig">0 %</div>
+          <div class="cap"><strong id="simCapTitle"></strong><span id="simCapSub"></span></div>
+        </div>
+        <div class="tiles" id="simKpis"></div>
+
+        <h3 class="subhead">Probabilidad de cada puesto</h3>
+        <p class="subsub">Cada barra suma 100 %. Cuanto más verde, más opciones de acabar arriba.</p>
+        <div class="dist" id="simDist"></div>
+        <div class="legend" aria-hidden="true" id="simLegend"></div>
+
+        <h3 class="subhead">Medallas esperadas en la semana</h3>
+        <p class="subsub">La marca ámbar es lo esperado. La franja va del escenario pesimista al optimista: solo 1 de cada 10 simulaciones queda fuera por cada lado.</p>
+        <div class="dist" id="simScore"></div>
+
+        <div class="tablewrap"><table class="dtable" id="simTable"></table></div>
+        <ul class="assume">
+          <li>Cada simulación elige al azar una de las últimas semanas de cada clan como su forma y reparte esas medallas entre los días de batalla, con la variabilidad diaria elegida.</li>
+          <li>Hoy parte de las medallas actuales y de los mazos pendientes: cada jugador pendiente juega o se deja mazos según su riesgo (pestaña Jugadores).</li>
+          <li>Carrera normal: el puesto de cada día da 3.000, 1.800, 1.000, 600 y 400 puntos de avance, más el bonus de las defensas del barco que siguen en pie; la meta está en 10.000. Se supone que no caen más defensas en los días que quedan. En coliseo gana quien suma más medallas.</li>
+          <li>El historial refleja cómo jugó cada clan, no cómo es hoy: si un rival ha cambiado mucho de miembros, tómalo con cautela.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="fig" aria-labelledby="histTitle">
+      <div class="fhead"><span class="fno">FIG. 09</span><h2 id="histTitle">Historial de las últimas semanas</h2></div>
+      <p class="fsub" hidden>Los datos con los que se simula, ordenados por medallas medias por día de batalla.</p>
+      <div class="hist" id="hist"></div>
+      <div class="legend" aria-hidden="true">
+        <span><i class="sw r1"></i>Puesto final de cada semana, de la más antigua a la más reciente</span>
+        <span><i class="sw" style="box-shadow:inset 0 0 0 2px var(--amber)"></i>Semana de coliseo</span>
+      </div>
+    </section>
+  </div>
+
+  <footer class="foot">
+    <p>Medallas por mazo: duelo ganado 250, batalla ganada 200, derrota 100 (75 en batalla de barco). Cada jugador tiene 4 mazos al día, con un tope de 200 mazos y 50 jugadores por clan.</p>
+    <p>Proyecto de fans, sin relación con Supercell. Datos de la API oficial de Clash Royale a través del proxy de RoyaleAPI. Código abierto: puedes alojar tu propia copia con tu servidor.</p>
+  </footer>
+</div>
+
+<script src="js/config.js?v=20261023"></script>
+<script src="js/calc.js?v=20261023"></script>
+<script src="js/sim.js?v=20261023"></script>
+<script src="js/demo.js?v=20261023"></script>
+<script src="js/news.js?v=20261023"></script>
+<script src="js/app.js?v=20261023"></script>
+<p class="fanpolicy">Contenido de fans, no afiliado ni respaldado por Supercell. Datos de la API oficial de Clash Royale.</p>
+</body>
+</html>

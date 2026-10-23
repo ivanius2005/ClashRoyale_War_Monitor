@@ -1,0 +1,23 @@
+{
+  "name": "clash-war-monitor",
+  "version": "1.0.0",
+  "description": "Monitor en directo y simulación Monte Carlo de la guerra de clanes de Clash Royale",
+  "main": "server.js",
+  "private": true,
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test",
+    "build:demo": "node scripts/build-demo.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "clash-royale",
+    "clan-wars",
+    "river-race",
+    "monte-carlo",
+    "royaleapi"
+  ],
+  "license": "MIT"
+}

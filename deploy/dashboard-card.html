@@ -1,0 +1,536 @@
+<!--
+  Tarjeta "Guerra de clanes" para dashboard.ivanius2005.es
+  ---------------------------------------------------------
+  Pégala donde quieras dentro del HTML del dashboard. Pide los datos a
+  /guerra-api/summary en el MISMO dominio del dashboard: el Cloudflare Tunnel
+  manda esa ruta al monitor de guerra (ver README, apartado 5).
+  Se actualiza sola cada minuto. Cambia GUERRA_URL si usas otro subdominio.
+-->
+<section class="cwcard" id="cwcard" aria-live="polite">
+  <style>
+    .cwcard{--g:#00ff41;--a:#ffb000;--r:#ff5a47;--t:#dde9e0;--w:#f5fbf6;--m:#9bb0a0;--d:#6e8474;--l:#1f2e24;--p:#0a110d;--p2:#101a14;--p3:#16241c;
+      font:14px/1.4 ui-monospace,"JetBrains Mono",Menlo,Consolas,monospace;color:var(--t);background:var(--p);
+      border:1px solid var(--l);border-radius:16px;padding:16px 18px;width:100%;max-width:1100px;box-sizing:border-box}
+    .cwcard *{box-sizing:border-box}
+    .cwcard a{color:inherit;text-decoration:none}
+    .cwcard .cw-h{display:flex;align-items:center;gap:10px;margin:0 0 12px;flex-wrap:wrap}
+    .cwcard .cw-h b{font-size:15px;letter-spacing:.04em;color:var(--w)}
+    .cwcard .cw-live{width:8px;height:8px;border-radius:50%;background:var(--m);flex:none}
+    .cwcard .cw-live.on{background:var(--g);box-shadow:0 0 8px var(--g)}
+    .cwcard .cw-day{margin-left:auto;color:var(--m);font-size:12px}
+    .cwcard .cw-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+    .cwcard .cw-k{background:var(--p2);border:1px solid var(--l);border-radius:10px;padding:9px 11px;min-width:0}
+    .cwcard .cw-k span{display:block;color:var(--m);font-size:11px;text-transform:uppercase;letter-spacing:.06em}
+    .cwcard .cw-k strong{display:block;font-size:22px;margin-top:2px;white-space:nowrap;color:var(--w)}
+    .cwcard .cw-k small{color:var(--m);font-size:11.5px;display:block}
+    .cwcard .g{color:var(--g)!important} .cwcard .a{color:var(--a)!important} .cwcard .r{color:var(--r)!important} .cwcard .mu{color:var(--m)}
+    .cwcard h4{margin:16px 0 6px;font-size:11.5px;color:var(--d);text-transform:uppercase;letter-spacing:.08em;font-weight:600}
+    .cwcard .cw-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid var(--l);border-radius:10px}
+    /* Color y fuente explícitos: si la página no tiene <!doctype html>, las tablas no los heredan */
+    .cwcard table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums;font:12.5px/1.35 ui-monospace,"JetBrains Mono",Menlo,Consolas,monospace;color:var(--t)}
+    .cwcard th,.cwcard td{padding:6px 8px;text-align:right;white-space:nowrap;border-bottom:1px solid var(--l)}
+    .cwcard tr:last-child td{border-bottom:0}
+    .cwcard th{position:sticky;top:0;background:var(--p3);color:var(--m);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.04em}
+    .cwcard th:first-child,.cwcard td:first-child{text-align:left;position:sticky;left:0;background:var(--p);z-index:1}
+    .cwcard th:first-child{background:var(--p3);z-index:2}
+    .cwcard tr.own td{color:var(--w)} .cwcard tr.own td:first-child{color:var(--g);font-weight:700}
+    .cwcard td.heat{text-align:center;min-width:44px;font-weight:600}
+    .cwcard .sep{border-left:1px solid var(--l)}
+    .cwcard details{margin-top:14px}
+    .cwcard summary{cursor:pointer;list-style:none;display:flex;align-items:center;gap:8px;padding:9px 12px;border:1px solid var(--l);border-radius:10px;background:var(--p2);color:var(--w);user-select:none}
+    .cwcard summary::-webkit-details-marker{display:none}
+    .cwcard summary::before{content:"▸";color:var(--g);transition:transform .15s}
+    .cwcard details[open] summary::before{transform:rotate(90deg)}
+    .cwcard summary .mu{margin-left:auto;font-size:12px}
+    .cwcard .cw-tools{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0 8px;align-items:center}
+    .cwcard .cw-tools button{font:inherit;font-size:12px;color:var(--m);background:var(--p2);border:1px solid var(--l);border-radius:999px;padding:4px 11px;cursor:pointer}
+    .cwcard .cw-tools button[aria-pressed="true"]{color:var(--g);border-color:var(--g)}
+    .cwcard .cw-tools input{font:inherit;font-size:12px;color:var(--t);background:var(--p2);border:1px solid var(--l);border-radius:999px;padding:4px 11px;margin-left:auto;min-width:0;width:12em}
+    .cwcard .cw-players{max-height:520px;overflow:auto}
+    .cwcard th button{all:unset;cursor:pointer}
+    .cwcard th button:hover,.cwcard th button.on{color:var(--g)}
+    .cwcard td .role{display:block;font-size:10.5px;color:var(--d);font-weight:400}
+    .cwcard td small{color:var(--d);margin-left:3px}
+    .cwcard tr.ex td{opacity:.55}
+    .cwcard .cw-note{color:var(--d);font-size:11.5px;margin:8px 0 0}
+    .cwcard .cw-pdf{margin-left:10px;padding:4px 11px;border:1px solid var(--g);border-radius:999px;color:var(--g)!important;font-size:12px;white-space:nowrap}
+    .cwcard .cw-pdf:hover{background:var(--g);color:#021004!important}
+    .cwcard .cw-month{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:8px}
+    .cwcard .cw-m{background:var(--p2);border:1px solid var(--l);border-radius:10px;padding:9px 11px;min-width:0}
+    .cwcard .cw-m span{display:block;color:var(--m);font-size:11px;text-transform:uppercase;letter-spacing:.06em}
+    .cwcard .cw-m strong{display:block;font-size:16px;margin-top:3px;color:var(--w);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .cwcard .cw-m small{display:block;color:var(--m);font-size:11.5px}
+    .cwcard .cw-m ol{margin:6px 0 0;padding:0 0 0 1.4em;color:var(--m);font-size:11.5px}
+    .cwcard .cw-pdf.locked{opacity:.55;cursor:not-allowed;border-color:var(--l);color:var(--m)!important}
+    .cwcard .cw-pdf.locked:hover{background:none}
+    .cwcard .cw-bar2{display:flex;align-items:center;gap:8px;margin:0 0 12px;flex-wrap:wrap}
+    .cwcard .cw-tabs{display:flex;gap:4px;padding:3px;border:1px solid var(--l);border-radius:999px;background:var(--p2)}
+    .cwcard .cw-tabs button{font:inherit;font-size:12.5px;color:var(--m);background:none;border:0;border-radius:999px;padding:5px 13px;cursor:pointer}
+    .cwcard .cw-tabs button[aria-selected="true"]{background:var(--g);color:#021004;font-weight:700}
+    .cwcard .cw-tabs button:focus-visible,.cwcard .cw-pdf:focus-visible{outline:2px solid var(--g);outline-offset:2px}
+    .cwcard .cw-bar2 .cw-pdf{margin-left:auto}
+    .cwcard .cw-panel[hidden]{display:none}
+    .cwcard .cw-risk{display:inline-flex;align-items:center;gap:7px;justify-content:flex-end}
+    .cwcard .cw-risk i{display:inline-block;width:46px;height:6px;border-radius:3px;background:#16241c;position:relative;overflow:hidden}
+    .cwcard .cw-risk i b{position:absolute;inset:0 auto 0 0;border-radius:3px}
+    .cwcard #caAvg th:nth-child(2),.cwcard #caAvg td:nth-child(2){text-align:left}
+    .cwcard #caAvg td:first-child{text-align:center}
+    .cwcard .cw-empty{padding:14px;border:1px dashed var(--l);border-radius:10px;color:var(--m);text-align:center}
+    .cwcard .cw-f{display:flex;justify-content:space-between;gap:10px;margin-top:12px;color:var(--m);font-size:12px;flex-wrap:wrap}
+    .cwcard .cw-f a{color:var(--g)}
+    .cwcard .cw-scroll{overscroll-behavior:contain}
+    /* Vistas de lista: solo cuando la tarjeta es estrecha (móvil o columna pequeña del dashboard) */
+    .cwcard{container-type:inline-size;container-name:cw}
+    .cwcard .cw-m-only{display:none}
+    .cwcard .mc{padding:10px 2px;border-bottom:1px solid var(--l)}
+    .cwcard .mc:last-child{border-bottom:0}
+    .cwcard .mc-h{display:flex;justify-content:space-between;gap:10px;font-size:13.5px}
+    .cwcard .mc.own .mc-h span{color:var(--g);font-weight:700}
+    .cwcard .mc-heat{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px;margin-top:7px}
+    .cwcard .mc-heat span{border-radius:6px;padding:4px 2px;text-align:center;font-size:12.5px;font-weight:700}
+    .cwcard .mc-heat small{display:block;font-size:10px;font-weight:400;opacity:.85}
+    .cwcard .mc-s,.cwcard .mr-s{color:var(--m);font-size:12px;margin-top:5px}
+    .cwcard .mlist{border:1px solid var(--l);border-radius:10px;padding:0 10px}
+    .cwcard .mr{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 10px;padding:10px 2px;border-bottom:1px solid var(--l);align-items:center}
+    .cwcard .mr:last-child{border-bottom:0}
+    .cwcard .mr.ex{opacity:.6}
+    .cwcard .mr-a{min-width:0}
+    .cwcard .mr-a b{display:block;font-weight:600;color:var(--w);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .cwcard .mr-a small{color:var(--d);font-size:11px}
+    .cwcard .mr-b{text-align:right;white-space:nowrap;font-size:13.5px}
+    .cwcard .mr-s{grid-column:1/-1;margin-top:1px}
+    .cwcard .mr-bar{grid-column:1/-1;height:5px;border-radius:3px;background:#16241c;overflow:hidden}
+    .cwcard .mr-bar i{display:block;height:100%;background:var(--g);border-radius:3px}
+    .cwcard .mr[data-exp]{cursor:pointer;-webkit-tap-highlight-color:transparent}
+    .cwcard .mr[data-exp]:focus-visible{outline:2px solid var(--g);outline-offset:-2px;border-radius:8px}
+    .cwcard .mr .chev{color:var(--g);display:inline-block;transition:transform .15s}
+    .cwcard .mr[aria-expanded="true"] .chev{transform:rotate(90deg)}
+    .cwcard .mr-x{grid-column:1/-1;display:grid;grid-template-columns:repeat(auto-fill,minmax(6.6em,1fr));gap:6px;margin-top:8px}
+    .cwcard .mr-x div{background:var(--p2);border:1px solid var(--l);border-radius:8px;padding:6px 8px}
+    .cwcard .mr-x span{display:block;color:var(--d);font-size:10.5px}
+    .cwcard .mr-x b{font-weight:600;color:var(--w);font-size:13px}
+    .cwcard .chip{display:inline-block;min-width:3.4em;text-align:center;padding:2px 7px;border-radius:999px;border:1px solid currentColor;font-size:12px;margin-left:8px}
+    .cwcard .cw-more{font:inherit;font-size:13px;width:100%;margin-top:8px;padding:10px;border:1px solid var(--l);border-radius:10px;background:var(--p2);color:var(--g);cursor:pointer}
+    .cwcard .cw-sortm{display:flex;align-items:center;gap:8px;margin:0 0 8px;color:var(--m);font-size:12px}
+    .cwcard .cw-sortm select{font:inherit;font-size:16px;color:var(--t);background:var(--p2);border:1px solid var(--l);border-radius:8px;padding:6px 8px;flex:1;min-width:0}
+    /* Con el prefijo .cwcard: dentro de @container las reglas no ganan especificidad */
+    @container cw (max-width: 640px) {
+      .cwcard .cw-d-only{display:none!important}
+      .cwcard .cw-m-only{display:block}
+      .cwcard .cw-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+      .cwcard .cw-k strong{font-size:19px}
+      .cwcard .cw-tools input{width:100%;margin-left:0;font-size:16px} /* 16 px: el iPhone no amplía la página al tocarlo */
+      .cwcard .cw-tools button{padding:7px 12px}
+      .cwcard .cw-tabs button{padding:7px 14px}
+    }
+    @media (max-width:640px){.cwcard{padding:14px 12px}}
+    @media (prefers-reduced-motion:reduce){.cwcard .mr .chev{transition:none}}
+  </style>
+
+  <a class="cw-h" id="cwLink" href="/">
+    <i class="cw-live" id="cwLive"></i><b>GUERRA DE CLANES</b><span class="cw-day" id="cwDay">cargando…</span>
+  </a>
+  <div class="cw-bar2">
+    <div class="cw-tabs" role="tablist" aria-label="Secciones">
+      <button type="button" role="tab" id="cwTabRace" data-tab="race" aria-selected="true">La carrera</button>
+      <button type="button" role="tab" id="cwTabClan" data-tab="clan" aria-selected="false" tabindex="-1">Mi clan</button>
+    </div>
+    <a class="cw-pdf" href="/guerra-api/report.pdf" target="_blank" rel="noopener" title="Informe del momento en PDF (para mandar por WhatsApp)">⤓ Exportar PDF</a>
+  </div>
+  <div class="cw-panel" data-panel="race" role="tabpanel" aria-labelledby="cwTabRace">
+  <div class="cw-kpis">
+    <div class="cw-k"><span>Puesto</span><strong id="cwPos">—</strong><small id="cwPosSub">&nbsp;</small></div>
+    <div class="cw-k"><span>Terminar 1º</span><strong id="cwWin">—</strong><small id="cwWinSub">&nbsp;</small></div>
+    <div class="cw-k"><span>Mazos hoy</span><strong id="cwDecks">—</strong><small id="cwDecksSub">&nbsp;</small></div>
+    <div class="cw-k"><span>Medallas hoy</span><strong id="cwMed">—</strong><small id="cwMedSub">&nbsp;</small></div>
+  </div>
+
+  <h4>La carrera · probabilidad de terminar la semana en cada puesto</h4>
+  <div class="cw-scroll cw-d-only"><table id="cwRace"></table></div>
+  <div class="cw-m-only mlist" id="cwRaceM"></div>
+
+  <h4>Miembro del mes · quien más medallas suma en la temporada</h4>
+  <div class="cw-month" id="cwMonth"></div>
+
+  </div>
+
+  <div class="cw-panel" data-panel="clan" role="tabpanel" aria-labelledby="cwTabClan" hidden>
+    <div class="cw-kpis">
+      <div class="cw-k"><span>Por atacar hoy</span><strong id="caLeft">—</strong><small id="caLeftSub">&nbsp;</small></div>
+      <div class="cw-k"><span>Se dejarían</span><strong id="caMiss">—</strong><small id="caMissSub">&nbsp;</small></div>
+      <div class="cw-k"><span>Jugar los 200</span><strong id="caAll">—</strong><small>probabilidad de que nadie se deje mazos</small></div>
+      <div class="cw-k"><span>Medallas por llegar</span><strong id="caMed">—</strong><small id="caMedSub">&nbsp;</small></div>
+    </div>
+    <h4>Quién queda por atacar · de más a menos riesgo de dejarse mazos</h4>
+    <div id="caPend"></div>
+    <p class="cw-note">Riesgo: probabilidad de que se deje alguno de los mazos que le quedan hoy, según los días que ha fallado en su historial (con pocas semanas se acerca a la media del clan). «Se dejaría»: mazos que se espera que no juegue.</p>
+    <h4>Media por ataque de cada jugador</h4>
+    <div class="cw-scroll cw-players cw-d-only" style="max-height:420px"><table id="caAvg"></table></div>
+    <div class="cw-m-only" id="caAvgM"></div>
+    <p class="cw-note">Medallas por ataque (por mazo jugado). Historial: todas las semanas guardadas. Toca una columna para ordenar.</p>
+
+  <details id="cwDet">
+    <summary>Detalle de todos los jugadores <span class="mu" id="cwPlSum"></span></summary>
+    <div class="cw-tools" role="group" aria-label="Filtro de jugadores">
+      <button type="button" data-f="all" aria-pressed="true">Todos</button>
+      <button type="button" data-f="pending" aria-pressed="false">Con mazos pendientes hoy</button>
+      <button type="button" data-f="ex" aria-pressed="false">Ya no están</button>
+      <input type="search" id="cwSearch" placeholder="Buscar jugador" aria-label="Buscar jugador">
+    </div>
+    <div class="cw-scroll cw-players cw-d-only"><table id="cwPl"></table></div>
+    <div class="cw-m-only" id="cwPlM"></div>
+    <p class="cw-note" id="cwPlNote"></p>
+  </details>
+  </div>
+
+  <div class="cw-f"><span id="cwAt"></span><a id="cwOpen" href="/monitor">Monitor completo →</a></div>
+
+  <script>
+  (() => {
+    const TAG = window.CW_CARD_TAG || '';   // clan de esta página (vacío = el del servidor)
+    const GUERRA_URL = '/monitor' + (TAG ? '?tag=' + TAG : ''); // monitor completo
+    const API = '/guerra-api/summary' + (TAG ? '?tag=' + encodeURIComponent(TAG) : '');
+    const $ = (id) => document.getElementById(id);
+    const fmt = (n) => (n == null ? '—' : String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, '.'));
+    const pct = (p) => (p == null ? '—' : p > 0 && p < 0.005 ? '<1 %' : `${Math.round(p * 100)} %`);
+    const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    $('cwLink').href = '/'; $('cwOpen').href = GUERRA_URL;
+    // PDF: por ahora solo para el clan de casa
+    if (window.CW_CARD_HOME === false) {
+      const pdf = document.querySelector('#cwcard .cw-pdf');
+      if (pdf) { pdf.removeAttribute('href'); pdf.setAttribute('aria-disabled', 'true'); pdf.classList.add('locked'); pdf.textContent = '🔒 PDF bloqueado'; pdf.title = 'Por ahora los PDF solo están disponibles para Furia Ibérica'; }
+    }
+
+    let data = null, filter = 'all', query = '', sort = { key: 'weekMedals', dir: -1 };
+    let lastSig = '';                       // para no redibujar si nada ha cambiado
+    const open = new Set();                 // jugadores desplegados en la lista del móvil
+    const more = { pend: false, avg: false, pl: false }; // «Ver todos» en las listas largas
+    const LIMIT = 10;
+    const moreBtn = (key, total) => (total > LIMIT
+      ? `<button type="button" class="cw-more" data-more="${key}">${more[key] ? 'Ver menos' : `Ver los ${total}`}</button>` : '');
+    const cut = (key, arr) => (more[key] ? arr : arr.slice(0, LIMIT));
+
+    // Mapa de calor: verde más intenso cuanto más probable
+    const heat = (p) => {
+      const a = Math.max(0, Math.min(1, p));
+      return `background:rgba(0,255,65,${(0.06 + a * 0.8).toFixed(3)});color:${a > 0.45 ? '#021004' : 'var(--t)'}`;
+    };
+
+    function renderTop(s) {
+      const own = s.clans.find((c) => c.own) || s.clans[0];
+      const others = s.clans.filter((c) => !c.own);
+      $('cwLive').className = 'cw-live on';
+      $('cwDay').textContent = s.race.label;
+      $('cwPos').textContent = `${own.position}º`;
+      $('cwPos').className = own.position === 1 ? 'g' : own.position === 2 ? 'a' : 'r';
+      const ref = own.position === 1 ? others[0] : s.clans.find((c) => !c.own && c.position === 1);
+      $('cwPosSub').textContent = !ref ? '' : s.race.colosseum
+        ? `${own.weekMedals >= ref.weekMedals ? '+' : '−'}${fmt(Math.abs((own.weekMedals || 0) - (ref.weekMedals || 0)))} vs ${ref.name}`
+        : `${own.progress >= ref.progress ? '+' : '−'}${fmt(Math.abs(own.progress - ref.progress))} vs ${ref.name}`;
+      $('cwWin').textContent = own.week ? pct(own.week.pFirst) : '—';
+      $('cwWinSub').textContent = own.week && own.week.pTieFirst > 0.01 ? `solos ${pct(own.week.pWinAlone)} · empate ${pct(own.week.pTieFirst)}`
+        : own.week ? `puesto esperado ${own.week.expectedRank.toFixed(1).replace('.', ',')}` : '';
+      $('cwDecks').textContent = s.race.training ? '—' : `${own.decksToday}/200`;
+      $('cwDecks').className = s.race.training ? '' : own.decksToday >= 200 ? 'g' : 'a';
+      $('cwDecksSub').textContent = s.race.training ? 'días de entrenamiento' : s.own && s.own.decksLeft ? `faltan ${s.own.decksLeft} · ${s.own.playersPending} jugadores` : 'todos jugados';
+      $('cwMed').textContent = s.race.training ? '—' : fmt(own.medalsToday);
+      $('cwMedSub').textContent = own.today ? `previsión ${fmt(own.today.expected)} · 1º hoy ${pct(own.today.pWin)}` : '';
+
+      const n = s.clans.length;
+      // Las probabilidades van justo después del avance: en el móvil se ven sin deslizar
+      const head = `<thead><tr><th>Clan</th><th>${s.race.colosseum ? 'Medallas' : 'Avance'}</th>`
+        + Array.from({ length: n }, (_, i) => `<th class="${i ? '' : 'sep'}">${i + 1}º</th>`).join('')
+        + '<th class="sep">Hoy</th><th>Mazos</th><th>Faltan</th></tr></thead>';
+      const rows = s.clans.map((c) => {
+        const p = c.week ? c.week.p : [];
+        const tie = c.week && c.week.pTieFirst > 0.01 ? ` title="Solos ${pct(c.week.pWinAlone)} · empatados ${pct(c.week.pTieFirst)}"` : '';
+        return `<tr class="${c.own ? 'own' : ''}"><td>${c.position}. ${esc(c.name)}</td>`
+          + `<td>${fmt(s.race.colosseum ? c.weekMedals : c.progress)}</td>`
+          + p.map((v, i) => `<td class="heat${i ? '' : ' sep'}" style="${heat(v)}"${i ? '' : tie}>${pct(v)}</td>`).join('')
+          + (s.race.training ? '<td class="sep mu">—</td><td class="mu">—</td><td class="mu">—</td>' // entrenamiento: no son mazos de guerra
+            : `<td class="sep">${fmt(c.medalsToday)}</td><td>${c.decksToday}/200</td><td class="${c.decksLeft ? 'a' : 'g'}">${c.decksLeft}</td>`)
+          + '</tr>';
+      }).join('');
+      $('cwRace').innerHTML = head + `<tbody>${rows}</tbody>`;
+      $('cwRaceM').innerHTML = s.clans.map((c) => {
+        const p = c.week ? c.week.p : [];
+        return `<div class="mc${c.own ? ' own' : ''}"><div class="mc-h"><span>${c.position}. ${esc(c.name)}</span><b>${fmt(s.race.colosseum ? c.weekMedals : c.progress)}</b></div>`
+          + `<div class="mc-heat">${p.map((v, i) => `<span style="${heat(v)}"><small>${i + 1}º</small>${pct(v)}</span>`).join('')}</div>`
+          + `<div class="mc-s">${s.race.training ? 'Días de entrenamiento' : `Hoy ${fmt(c.medalsToday)} · ${c.decksToday}/200 mazos${c.decksLeft ? ` · faltan <span class="a">${c.decksLeft}</span>` : ''}`}</div></div>`;
+      }).join('');
+      $('cwAt').textContent = `actualizado ${new Date(s.at).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })} · ${fmt(s.runs)} simulaciones`;
+    }
+
+    // Columnas de la tabla de jugadores
+    function columns(s) {
+      const pl = s.players;
+      const cols = [
+        { key: 'name', label: 'Jugador', val: (p) => p.name.toLowerCase(),
+          html: (p) => `${esc(p.name)}<span class="role">${p.member ? esc(p.role || '') : 'ya no está'}</span>` },
+        { key: 'today', label: 'Hoy', val: (p) => p.today.decks,
+          html: (p) => s.race.training ? '—' : `<span class="${p.today.decks >= 4 ? 'g' : p.member ? 'a' : ''}">${p.today.decks}/4</span>${p.today.medals != null ? `<small>${fmt(p.today.medals)}</small>` : ''}` },
+        { key: 'weekDecks', label: 'Mazos', val: (p) => p.week.decks, html: (p) => `${p.week.decks}<small>/16</small>`, sep: true },
+        { key: 'weekMedals', label: 'Medallas', val: (p) => p.week.medals, html: (p) => fmt(p.week.medals) },
+        { key: 'perDay', label: 'Por día', val: (p) => p.week.perDay || 0, html: (p) => fmt(p.week.perDay) },
+        { key: 'perDeck', label: 'Por mazo', val: (p) => p.week.perDeck || 0, html: (p) => fmt(p.week.perDeck) },
+      ];
+      const days = s.race.training ? 0 : Math.max(0, s.race.battleDay);
+      if (pl.daily) {
+        for (let i = 0; i < days; i++) {
+          cols.push({ key: `d${i}`, label: `Día ${i + 1}`, sep: i === 0, val: (p) => (p.days && p.days[i] ? (p.days[i].medals ?? p.days[i].decks) : -1),
+            html: (p) => {
+              const d = p.days && p.days[i];
+              if (!d) return '<span class="mu">—</span>';
+              const cls = d.decks >= 4 ? '' : d.decks === 0 ? 'r' : 'a';
+              return `${d.medals != null ? fmt(d.medals) : ''}<small class="${cls}">${d.decks}/4</small>`;
+            } });
+        }
+      }
+      pl.weekLabels.forEach((label, i) => {
+        cols.push({ key: `w${i}`, label: i === 0 ? 'Sem. −1' : `−${i + 1}`, title: label, sep: i === 0,
+          val: (p) => (p.prev[i] ? p.prev[i].medals : -1),
+          html: (p) => (p.prev[i] ? `${fmt(p.prev[i].medals)}<small class="${p.prev[i].decks >= 16 ? '' : 'a'}">${p.prev[i].decks}</small>` : '<span class="mu">—</span>') });
+      });
+      if (pl.weekLabels.length) cols.push({ key: 'prevAvg', label: 'Media', title: 'Media de las semanas anteriores en que jugó', val: (p) => p.prevAvg || 0, html: (p) => fmt(p.prevAvg) });
+      return cols;
+    }
+
+    function renderPlayers(s) {
+      const pl = s.players;
+      if (!pl) { $('cwDet').hidden = true; return; }
+      $('cwDet').hidden = false;
+      const members = pl.list.filter((p) => p.member);
+      const pend = members.filter((p) => p.today.left > 0);
+      $('cwPlSum').textContent = s.race.training ? `${members.length} en el clan`
+        : `${members.length} en el clan · ${pend.length} con mazos pendientes`;
+      const cols = columns(s);
+      if (!cols.some((c) => c.key === sort.key)) sort = { key: 'weekMedals', dir: -1 };
+      let list = pl.list.filter((p) => (filter === 'pending' ? p.member && p.today.left > 0 : filter === 'ex' ? !p.member : p.member));
+      if (query) list = list.filter((p) => p.name.toLowerCase().includes(query));
+      const col = cols.find((c) => c.key === sort.key);
+      list = list.slice().sort((a, b) => {
+        const va = col.val(a), vb = col.val(b);
+        return (va < vb ? -1 : va > vb ? 1 : 0) * sort.dir || a.name.localeCompare(b.name, 'es');
+      });
+      const head = '<thead><tr>' + cols.map((c) =>
+        `<th class="${c.sep ? 'sep' : ''}"${c.title ? ` title="${esc(c.title)}"` : ''}><button type="button" data-k="${c.key}" class="${c.key === sort.key ? 'on' : ''}">${esc(c.label)}${c.key === sort.key ? (sort.dir < 0 ? ' ↓' : ' ↑') : ''}</button></th>`).join('') + '</tr></thead>';
+      const body = list.length
+        ? list.map((p) => `<tr class="${p.member ? '' : 'ex'}">${cols.map((c) => `<td class="${c.sep ? 'sep' : ''}">${c.html(p)}</td>`).join('')}</tr>`).join('')
+        : `<tr><td colspan="${cols.length}" class="mu">Nadie con este filtro.</td></tr>`;
+      $('cwPl').innerHTML = head + `<tbody>${body}</tbody>`;
+      const sopt = (k, label) => `<option value="${k}"${sort.key === k ? ' selected' : ''}>${label}</option>`;
+      const days = s.race.training ? 0 : Math.max(0, s.race.battleDay);
+      const item = (p) => {
+        const isOpen = open.has(p.tag);
+        const todayCls = p.today.decks >= 4 ? 'g' : p.member ? 'a' : '';
+        let x = '';
+        if (isOpen) {
+          const box = (label, value) => `<div><span>${label}</span><b>${value}</b></div>`;
+          const cells = [box('Mazos semana', `${p.week.decks}/16`), box('Por día', fmt(p.week.perDay)), box('Por mazo', fmt(p.week.perDeck))];
+          for (let i = 0; i < days; i++) {
+            const d = p.days && p.days[i];
+            cells.push(box(`Día ${i + 1}`, d ? `${d.medals != null ? fmt(d.medals) : '—'} · ${d.decks}/4` : '—'));
+          }
+          (pl.weekLabels || []).forEach((label, i) => {
+            const w = p.prev[i];
+            cells.push(box(esc(label), w ? `${fmt(w.medals)} · ${w.decks}` : '—'));
+          });
+          if (pl.weekLabels.length) cells.push(box('Media ant.', fmt(p.prevAvg)));
+          x = `<div class="mr-x">${cells.join('')}</div>`;
+        }
+        return `<div class="mr${p.member ? '' : ' ex'}" data-exp="${esc(p.tag)}" role="button" tabindex="0" aria-expanded="${isOpen}">`
+          + `<div class="mr-a"><b><span class="chev" aria-hidden="true">▸</span> ${esc(p.name)}</b><small>${p.member ? esc(p.role || '') : 'ya no está'}</small></div>`
+          + `<div class="mr-b">${s.race.training ? '' : `<span class="${todayCls}">${p.today.decks}/4</span> · `}<b>${fmt(p.week.medals)}</b></div>`
+          + `<div class="mr-s">${p.week.decks}/16 mazos · ${fmt(p.week.perDay)} por día · ${fmt(p.week.perDeck)} por mazo</div>${x}</div>`;
+      };
+      $('cwPlM').innerHTML = `<label class="cw-sortm">Ordenar por <select data-sort="pl">${sopt('weekMedals', 'Medallas de la semana')}${sopt('today', 'Mazos de hoy')}`
+        + `${sopt('weekDecks', 'Mazos de la semana')}${sopt('perDay', 'Medallas por día')}${sopt('perDeck', 'Medallas por mazo')}`
+        + `${pl.weekLabels.length ? sopt('prevAvg', 'Media de semanas anteriores') : ''}${sopt('name', 'Nombre')}</select></label>`
+        + (list.length ? `<div class="mlist">${cut('pl', list).map(item).join('')}</div>${moreBtn('pl', list.length)}` : '<div class="cw-empty">Nadie con este filtro.</div>');
+      $('cwPlNote').textContent = pl.daily
+        ? 'Día a día: medallas y mazos (x/4). Semanas anteriores: medallas y mazos de 16. Toca una columna para ordenar.'
+        : 'Para ver las medallas de cada día hace falta el registro diario (TRACK_CLANS en el .env del monitor). Toca una columna para ordenar.';
+    }
+
+    $('cwPl').addEventListener('click', (e) => {
+      const b = e.target.closest('button[data-k]');
+      if (!b || !data) return;
+      sort = sort.key === b.dataset.k ? { key: sort.key, dir: -sort.dir } : { key: b.dataset.k, dir: b.dataset.k === 'name' ? 1 : -1 };
+      renderPlayers(data);
+    });
+    document.querySelectorAll('#cwcard .cw-tools button').forEach((b) => b.addEventListener('click', () => {
+      filter = b.dataset.f;
+      document.querySelectorAll('#cwcard .cw-tools button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+      if (data) renderPlayers(data);
+    }));
+    $('cwSearch').addEventListener('input', (e) => { query = e.target.value.trim().toLowerCase(); if (data) renderPlayers(data); });
+
+    function renderMonth(s) {
+      const m = s.monthly;
+      const box = (b, title, sub) => {
+        if (!b || !b.top || !b.top.length) return `<div class="cw-m"><span>${esc(title)}</span><strong>—</strong><small>sin datos</small></div>`;
+        const [lead, ...rest] = b.top;
+        return `<div class="cw-m"><span>${esc(title)}</span><strong>${esc(lead.name)}</strong>`
+          + `<small>${fmt(lead.medals)} medallas · ${lead.decks} mazos${lead.member === false ? ' · ya no está' : ''} · ${esc(sub)}</small>`
+          + `<ol start="2">${rest.slice(0, 2).map((e) => `<li>${esc(e.name)} · ${fmt(e.medals)}</li>`).join('')}</ol></div>`;
+      };
+      $('cwMonth').innerHTML = !m ? '<div class="cw-m"><small>Sin historial suficiente.</small></div>'
+        : box(m.current, `Temporada ${m.current.seasonId} · en curso`, `${m.current.weeksCounted} sem.`)
+        + box(m.previous, `Temporada ${m.previous.seasonId} · terminada`, m.previous.complete ? 'final' : `${m.previous.weeksCounted} sem. en el historial`);
+    }
+
+    // ---------- pestañas ----------
+    const tabs = [...document.querySelectorAll('#cwcard [role="tab"]')];
+    const showTab = (name) => {
+      tabs.forEach((t) => { const on = t.dataset.tab === name; t.setAttribute('aria-selected', String(on)); t.tabIndex = on ? 0 : -1; });
+      document.querySelectorAll('#cwcard .cw-panel').forEach((p) => { p.hidden = p.dataset.panel !== name; });
+      try { localStorage.setItem('cwcard:tab', name); } catch { /* sin almacenamiento */ }
+    };
+    tabs.forEach((t, i) => {
+      t.addEventListener('click', () => showTab(t.dataset.tab));
+      t.addEventListener('keydown', (e) => {
+        if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+        const n = tabs[(i + 1) % tabs.length]; showTab(n.dataset.tab); n.focus();
+      });
+    });
+    try { const saved = localStorage.getItem('cwcard:tab'); if (saved === 'clan') showTab('clan'); } catch { /* nada */ }
+
+    // ---------- pestaña del clan: quién queda y media por ataque ----------
+    const riskCls = (r) => (r >= 0.25 ? 'r' : r >= 0.1 ? 'a' : 'g');
+    const riskColor = (r) => (r >= 0.25 ? 'var(--r)' : r >= 0.1 ? 'var(--a)' : 'var(--g)');
+    const dec1 = (x) => (x == null ? '—' : x.toFixed(1).replace('.', ','));
+    let avgSort = { key: 'hist', dir: -1 };
+
+    function renderClan(s) {
+      const own = s.clans.find((c) => c.own) || s.clans[0];
+      $('cwTabClan').textContent = own.name;
+      const pl = s.players, a = pl && pl.attacks;
+      if (!pl || !a) { $('caPend').innerHTML = '<div class="cw-empty">Sin datos de los jugadores.</div>'; return; }
+      $('caLeft').textContent = s.race.training ? '—' : a.decksLeft;
+      $('caLeft').className = s.race.training ? '' : a.decksLeft ? 'a' : 'g';
+      $('caLeftSub').textContent = s.race.training ? 'días de entrenamiento' : a.decksLeft ? `mazos de ${a.players} jugadores` : 'todos han atacado';
+      $('caMiss').textContent = s.race.training || !a.decksLeft ? '0' : `≈${dec1(a.expMissed)}`;
+      $('caMiss').className = !a.decksLeft ? 'g' : a.expMissed >= 8 ? 'r' : a.expMissed >= 3 ? 'a' : 'g';
+      $('caMissSub').textContent = a.decksLeft ? `mazos sin jugar esperados (${fmt(a.expMissed * (a.clanPerDeck || 160))} medallas)` : 'nadie se deja nada';
+      $('caAll').textContent = s.race.training ? '—' : pct(a.pAll);
+      $('caAll').className = s.race.training ? '' : a.pAll >= 0.6 ? 'g' : a.pAll >= 0.3 ? 'a' : 'r';
+      $('caMed').textContent = s.race.training ? '—' : fmt(a.expMedals);
+      $('caMedSub').textContent = a.decksLeft ? `previsión de lo que falta · media ${fmt(a.clanPerDeck)} por ataque` : '';
+
+      const pend = pl.list.filter((p) => p.attack.left > 0)
+        .sort((x, y) => y.attack.risk - x.attack.risk || y.attack.left - x.attack.left || x.name.localeCompare(y.name, 'es'));
+      if (s.race.training) $('caPend').innerHTML = '<div class="cw-empty">Hoy no hay guerra: son días de entrenamiento.</div>';
+      else if (!pend.length) $('caPend').innerHTML = '<div class="cw-empty">Todos han jugado sus 4 mazos hoy.</div>';
+      else {
+        const rows = pend.map((p) => {
+          const t = p.attack;
+          const hist = t.days ? `${t.missDays} de ${t.days} días${t.lowData ? ' · pocos datos' : ''}` : 'sin historial';
+          return `<tr><td>${esc(p.name)}<span class="role">${esc(p.role || '')}</span></td>`
+            + `<td class="a">${t.left}/4</td>`
+            + `<td><span class="cw-risk"><span class="${riskCls(t.risk)}">${pct(t.risk)}</span><i><b style="width:${Math.min(100, t.risk * 100).toFixed(0)}%;background:${riskColor(t.risk)}"></b></i></span></td>`
+            + `<td>${dec1(t.expMissed)}</td><td class="sep">${fmt(t.perDeckWeek)}</td><td>${fmt(t.perDeckHist)}</td>`
+            + `<td class="sep mu">${hist}</td></tr>`;
+        }).join('');
+        const mobile = cut('pend', pend).map((p) => {
+          const t = p.attack;
+          const hist = t.days ? `falló ${t.missDays} de ${t.days} días` : 'sin historial';
+          return `<div class="mr"><div class="mr-a"><b>${esc(p.name)}</b><small>${esc(p.role || '')}</small></div>`
+            + `<div class="mr-b"><span class="a">${t.left}/4</span><span class="chip ${riskCls(t.risk)}" title="Riesgo de dejarse mazos">${pct(t.risk)}</span></div>`
+            + `<div class="mr-s">se dejaría ${dec1(t.expMissed)} · media ${fmt(t.perDeckWeek)} (hist. ${fmt(t.perDeckHist)}) · ${hist}</div></div>`;
+        }).join('');
+        $('caPend').innerHTML = `<div class="cw-m-only"><div class="mlist">${mobile}</div>${moreBtn('pend', pend.length)}</div>`
+          + `<div class="cw-scroll cw-players cw-d-only" style="max-height:440px"><table><thead><tr><th>Jugador</th><th>Le quedan</th><th>Riesgo hoy</th><th>Se dejaría</th>`
+          + `<th class="sep">Media semana</th><th>Media historial</th><th class="sep">Días con mazos sin jugar</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+      }
+
+      // Media por ataque de todos los miembros
+      const cols = {
+        name: (p) => p.name.toLowerCase(), week: (p) => p.attack.perDeckWeek ?? -1, weekN: (p) => p.week.decks,
+        hist: (p) => p.attack.perDeckHist ?? -1, histN: (p) => p.attack.histDecks,
+      };
+      const list = pl.list.filter((p) => p.member).slice().sort((x, y) => {
+        const va = cols[avgSort.key](x), vb = cols[avgSort.key](y);
+        return (va < vb ? -1 : va > vb ? 1 : 0) * avgSort.dir || x.name.localeCompare(y.name, 'es');
+      });
+      const maxAvg = Math.max(1, ...list.map((p) => p.attack.perDeckHist || p.attack.perDeckWeek || 0));
+      const th = (k, label, sep) => `<th class="${sep ? 'sep' : ''}"><button type="button" data-ak="${k}" class="${avgSort.key === k ? 'on' : ''}">${label}${avgSort.key === k ? (avgSort.dir < 0 ? ' ↓' : ' ↑') : ''}</button></th>`;
+      $('caAvg').innerHTML = `<thead><tr><th>#</th>${th('name', 'Jugador')}${th('week', 'Esta semana', true)}${th('weekN', 'Ataques')}${th('hist', 'Historial', true)}${th('histN', 'Ataques')}<th></th></tr></thead><tbody>`
+        + list.map((p, i) => {
+          const v = p.attack.perDeckHist || p.attack.perDeckWeek || 0;
+          return `<tr><td class="mu">${i + 1}</td><td>${esc(p.name)}</td><td class="sep">${fmt(p.attack.perDeckWeek)}</td><td class="mu">${p.week.decks}</td>`
+            + `<td class="sep">${fmt(p.attack.perDeckHist)}</td><td class="mu">${p.attack.histDecks || '—'}</td>`
+            + `<td><span class="cw-risk"><i style="width:70px"><b style="width:${(v / maxAvg * 100).toFixed(0)}%;background:var(--g)"></b></i></span></td></tr>`;
+        }).join('') + '</tbody>';
+      const opt = (k, label) => `<option value="${k}"${avgSort.key === k ? ' selected' : ''}>${label}</option>`;
+      $('caAvgM').innerHTML = `<label class="cw-sortm">Ordenar por <select data-sort="avg">${opt('hist', 'Media del historial')}${opt('week', 'Media de esta semana')}${opt('name', 'Nombre')}</select></label>`
+        + `<div class="mlist">${cut('avg', list).map((p, i) => {
+          const v = avgSort.key === 'week' ? p.attack.perDeckWeek : p.attack.perDeckHist;
+          return `<div class="mr"><div class="mr-a"><b>${i + 1}. ${esc(p.name)}</b></div><div class="mr-b"><b>${fmt(v)}</b></div>`
+            + `<div class="mr-s">${avgSort.key === 'week' ? `historial ${fmt(p.attack.perDeckHist)}` : `esta semana ${fmt(p.attack.perDeckWeek)}`} · ${p.week.decks} ataques esta semana · ${p.attack.histDecks || 0} en el historial</div>`
+            + `<div class="mr-bar"><i style="width:${((v || 0) / maxAvg * 100).toFixed(0)}%"></i></div></div>`;
+        }).join('')}</div>${moreBtn('avg', list.length)}`;
+    }
+    $('caAvg').addEventListener('click', (e) => {
+      const b = e.target.closest('button[data-ak]');
+      if (!b || !data) return;
+      avgSort = avgSort.key === b.dataset.ak ? { key: avgSort.key, dir: -avgSort.dir } : { key: b.dataset.ak, dir: b.dataset.ak === 'name' ? 1 : -1 };
+      renderClan(data);
+    });
+
+    // Listas del móvil: desplegar jugadores, «Ver todos» y ordenar
+    const card = $('cwcard');
+    card.addEventListener('click', (e) => {
+      if (!data) return;
+      const m = e.target.closest('[data-more]');
+      if (m) { more[m.dataset.more] = !more[m.dataset.more]; m.dataset.more === 'pl' ? renderPlayers(data) : renderClan(data); return; }
+      const x = e.target.closest('[data-exp]');
+      if (x) { open.has(x.dataset.exp) ? open.delete(x.dataset.exp) : open.add(x.dataset.exp); renderPlayers(data); }
+    });
+    card.addEventListener('keydown', (e) => {
+      const x = e.target.closest('[data-exp]');
+      if (!x || (e.key !== 'Enter' && e.key !== ' ')) return;
+      e.preventDefault(); const tag = x.dataset.exp;
+      open.has(tag) ? open.delete(tag) : open.add(tag); renderPlayers(data);
+      const again = card.querySelector(`[data-exp="${CSS.escape(tag)}"]`); if (again) again.focus();
+    });
+    card.addEventListener('change', (e) => {
+      const sel = e.target.closest('select[data-sort]');
+      if (!sel || !data) return;
+      const dir = sel.value === 'name' ? 1 : -1;
+      if (sel.dataset.sort === 'avg') { avgSort = { key: sel.value, dir }; renderClan(data); }
+      else { sort = { key: sel.value, dir }; renderPlayers(data); }
+    });
+
+    // Redibuja sin mover nada: conserva el desplazamiento de las tablas
+    function renderAll(s) {
+      const pos = [...card.querySelectorAll('.cw-scroll')].map((el) => [el.querySelector('table') && el.querySelector('table').id, el.scrollLeft, el.scrollTop]);
+      renderTop(s); renderMonth(s); renderClan(s); renderPlayers(s);
+      for (const [id, l, t] of pos) {
+        const el = id && $(id) && $(id).closest('.cw-scroll');
+        if (el) { el.scrollLeft = l; el.scrollTop = t; }
+      }
+    }
+
+    async function tick() {
+      try {
+        const r = await fetch(API, { headers: { Accept: 'application/json' }, credentials: 'same-origin' });
+        if (!r.ok) throw new Error(r.status);
+        const next = await r.json();
+        const sig = JSON.stringify({ ...next, at: 0 });
+        data = next;
+        if (sig === lastSig) {   // nada nuevo: solo la hora, sin redibujar
+          $('cwAt').textContent = `actualizado ${new Date(next.at).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })} · ${fmt(next.runs)} simulaciones`;
+          return;
+        }
+        lastSig = sig;
+        renderAll(data);
+      } catch (e) {
+        $('cwLive').className = 'cw-live';
+        $('cwDay').textContent = 'sin conexión con el monitor';
+      }
+    }
+    tick();
+    setInterval(() => { if (!document.hidden) tick(); }, 60000);
+  })();
+  </script>
+</section>

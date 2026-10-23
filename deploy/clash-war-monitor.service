@@ -1,0 +1,21 @@
+[Unit]
+Description=Clash War Monitor
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Cambia "ivanius" por tu usuario (comando: whoami) y la ruta si la instalas en otro sitio
+User=ivanius
+WorkingDirectory=/opt/clash-war-monitor
+ExecStart=/usr/bin/node /opt/clash-war-monitor/server.js
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+ProtectSystem=full
+PrivateTmp=true
+# Tope de seguridad: si algo fuera mal, nunca se come la RAM de la máquina
+MemoryMax=200M
+
+[Install]
+WantedBy=multi-user.target

@@ -23,6 +23,10 @@ const schedule = require('./lib/schedule');
 const discord = require('./lib/discord');
 const news = require('./public/js/news.js');
 const { spawn } = require('node:child_process');
+// Conectar por IPv4 primero: en redes con IPv6 a medias (la máquina tiene dirección IPv6 pero el router no la saca a
+// internet), las conexiones a la API se quedan colgadas hasta agotar el tiempo. IPv4 funciona siempre.
+require('node:dns').setDefaultResultOrder('ipv4first');
+try { require('node:net').setDefaultAutoSelectFamily(true); } catch { /* Node antiguo */ }
 
 const host = process.env.HOST || '127.0.0.1';
 const CONFIG = {

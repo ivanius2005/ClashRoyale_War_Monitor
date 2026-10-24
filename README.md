@@ -426,3 +426,14 @@ Contenido de fans, no afiliado ni respaldado por Supercell.
 su mazo actual con evoluciones y héroes, las 15 últimas batallas con su porcentaje de victorias,
 su actividad en la guerra de su clan actual (esta semana y las 10 últimas) y el reparto de niveles de sus cartas.
 API: `GET /api/player/TAG`. Las consultas de jugadores nuevos cuentan para el mismo tope por minuto que los clanes.
+
+## Ranking de guerra y análisis en PDF
+
+- **Ranking** (`GET /api/ranking/TAG`, sección «Ranking de guerra» del monitor): puesto del clan en el top 100 de su país
+  y en el top 1000 mundial (N/A si no aparece) y previsión de dónde acabará según su puesto de la semana
+  (+20/+10/−5/−10/−20 trofeos; ×5 en coliseo). Se simula cómo acaban los demás clanes del top: los rivales de la
+  carrera ocupan los puestos libres y el resto, uno al azar. Como la API corta el mundial en 1000, se estiman los
+  clanes de justo debajo con la densidad de los últimos 100.
+- **PDF de análisis** del clan de casa (`/api/day.pdf`, `/api/week.pdf`, `/api/colosseum.pdf`): último día de
+  batalla terminado (los 5 clanes y cada jugador), última semana y último coliseo (clasificación, trofeos, jugadores
+  y desglose por día si hay registro diario).

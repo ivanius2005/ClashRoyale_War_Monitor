@@ -1108,6 +1108,7 @@ async function load(tag, quiet = false) {
     state.tag = tag;
     accept(body);
     loadNews(tag);
+    loadRanking(tag);
     setMsg($('msg'), null);
     hideResults();
     if (!state.locked) {
@@ -1327,6 +1328,53 @@ function saveSeen(tag, full) {
   } catch { /* almacenamiento lleno o bloqueado: no pasa nada */ }
 }
 
+// ---------- Ranking de guerra (país top 100 y mundial top 1000) con la previsión de la semana ----------
+async function loadRanking(tag) {
+  if (state.demo || !state.conf) { $('figRank').hidden = true; return; }
+  try {
+    const r = await getJson(`api/ranking/${encodeURIComponent(tag)}`);
+    if (state.tag !== tag) return;
+    renderRanking(r);
+  } catch {
+    $('figRank').hidden = true;
+  }
+}
+
+function countryName(x) {
+  try { if (x.code) return new Intl.DisplayNames(['es'], { type: 'region' }).of(x.code); } catch { /* sin Intl */ }
+  return x.name || 'su país';
+}
+
+function rankBlock(x, label, where) {
+  if (!x) return `<div class="rnk"><h3>${esc(label)}</h3><p class="rnk-now">N/A</p><p class="rnk-sub">El clan no tiene un país asignado</p></div>`;
+  const pos = (o) => (o.pIn < 0.5 ? 'N/A' : `${o.median}º`);
+  const win = x.outcomes && x.outcomes[0];
+  let head = '';
+  if (win) {
+    if (win.pIn < 0.5) head = `Ni ganando esta semana entraríais en el top ${fmt(x.top)} ${where}`;
+    else if (!x.current) head = `Si ganáis esta semana entraréis en el top ${fmt(x.top)} ${where}, en el ${win.median}º`;
+    else if (win.median < x.current) head = `Si ganáis esta semana subiréis del ${x.current}º al ${win.median}º ${where}`;
+    else if (win.median === x.current) head = `Si ganáis esta semana seguiréis en el ${x.current}º ${where}`;
+    else head = `Aunque ganéis, bajaréis del ${x.current}º al ${win.median}º ${where} (otros clanes subirán más)`;
+  }
+  const rows = (x.outcomes || []).map((o) => `<tr><td>${o.rank}º</td><td class="${o.delta > 0 ? 'up' : 'down'}">${o.delta > 0 ? '+' : ''}${o.delta}</td>` +
+    `<td><b>${pos(o)}</b></td><td class="dim">${o.pIn < 0.5 || o.p10 === o.p90 ? '' : `${o.p10}º–${o.p90}º`}</td></tr>`).join('');
+  const exp = x.expected ? `<p class="rnk-sub">Con las probabilidades de esta semana, lo más probable: <b>${x.expected.pIn < 0.5 ? 'N/A' : `${x.expected.median}º`}</b></p>` : '';
+  return `<div class="rnk"><h3>${esc(label)} <span class="dim">· top ${fmt(x.top)}</span></h3>` +
+    `<p class="rnk-now">${x.current ? `${x.current}º` : 'N/A'}</p>` +
+    `<p class="rnk-sub">${x.current ? `${fmt(x.trophies)} trofeos de guerra` : `fuera del top ${fmt(x.top)}${x.cutoff ? ` (el último tiene ${fmt(x.cutoff)}; vosotros ${fmt(x.trophies)})` : ''}`}</p>` +
+    (head ? `<p class="rnk-head">${esc(head)}</p>` : '') +
+    (rows ? `<table class="rnk-t"><thead><tr><th>Si acabáis</th><th>Trofeos</th><th>Puesto</th><th>Margen</th></tr></thead><tbody>${rows}</tbody></table>` : '') + exp + '</div>';
+}
+
+function renderRanking(r) {
+  const country = r.country ? countryName(r.country) : 'País';
+  $('rankGrid').innerHTML = rankBlock(r.country, country, r.country ? `de ${country}` : '') + rankBlock(r.world, 'Mundial', 'del mundo');
+  $('rankNote').textContent = `${r.colosseum ? 'Semana de coliseo: los trofeos se multiplican por 5. ' : ''}Al acabar la semana, el 1º suma ${r.colosseum ? 100 : 20}, el 2º ${r.colosseum ? 50 : 10}, el 3º resta ${r.colosseum ? 25 : 5}, el 4º ${r.colosseum ? 50 : 10} y el 5º ${r.colosseum ? 100 : 20}. ` +
+    'Se simula cómo acaban los demás clanes del top: vuestros rivales de carrera ocupan los puestos que dejáis y el resto, uno al azar. Margen: 8 de cada 10 simulaciones. N/A: fuera del top.';
+  $('figRank').hidden = false;
+}
+
 async function loadNews(tag) {
   if (state.demo || !state.conf) { $('figNews').hidden = true; return; }
   try {
@@ -1360,6 +1408,10 @@ function renderNews() {
   $('figNews').hidden = !sum;
   if (!sum) return;
   $('pdfNow').hidden = !(state.conf && state.conf.pdf && isHomeClan());
+  // Análisis en PDF: activos para el clan de casa, «bloqueados» para los demás
+  setPdfButton($('pdfDay'), 'api/day.pdf');
+  setPdfButton($('pdfWeek'), 'api/week.pdf');
+  setPdfButton($('pdfCol'), 'api/colosseum.pdf');
 
   // Desde tu última visita
   if (!state.prevSeen) {

@@ -249,6 +249,7 @@ function raceClanTags(race) {
 
 // Ficha de un jugador: perfil + últimas batallas + guerra de su clan actual (esta semana y las 10 últimas)
 const PlayerView = require('./lib/player-view');
+const Analysis = require('./lib/analysis');
 function getPlayer(tag) {
   return cached(`player:${tag}`, Math.max(60e3, CONFIG.liveCacheMs), async () => {
     const profile = await cr(`/players/%23${tag}`).catch((e) => {
@@ -263,6 +264,38 @@ function getPlayer(tag) {
       ct ? cached(`rlog:${ct}`, CONFIG.historyCacheMs, () => cr(`/clans/%23${ct}/riverracelog?limit=10`)).catch(() => null) : null,
     ]);
     return PlayerView.build(profile, log, race, rlog, { fetchedAt: new Date().toISOString() });
+  });
+}
+
+// Historial de semanas del clan (solo el suyo, 10 semanas)
+function getRiverlog(tag) {
+  return cached(`rlog:${tag}`, CONFIG.historyCacheMs, () => cr(`/clans/%23${tag}/riverracelog?limit=10`));
+}
+
+// Ranking de guerra del país del clan (top 100) y mundial (top 1000), con la previsión según cómo acabe la semana
+const Rankings = require('./lib/rankings');
+function getRanking(tag) {
+  return cached(`ranking:${tag}`, CONFIG.historyCacheMs, async () => {
+    const clan = await cached(`clan:${tag}`, CONFIG.historyCacheMs, () => cr(`/clans/%23${tag}`));
+    const loc = clan.location && clan.location.isCountry ? clan.location : null;
+    const [country, world, war, sum] = await Promise.all([
+      loc ? cached(`rk:${loc.id}`, CONFIG.historyCacheMs, () => cr(`/locations/${loc.id}/rankings/clanwars?limit=150`)).catch(() => null) : null,
+      cached('rk:global', CONFIG.historyCacheMs, () => cr('/locations/global/rankings/clanwars?limit=1000')).catch(() => null),
+      getWar(tag).catch(() => null),
+      getSummary(tag).catch(() => null),
+    ]);
+    const race = war && war.race;
+    const colosseum = !!race && race.periodType === 'colosseum';
+    const rivals = race ? (race.clans || []).map((c) => c.tag) : [];
+    const own = sum && (sum.clans || []).find((c) => c.own);
+    const ourP = own && own.week && Array.isArray(own.week.p) ? own.week.p : null;
+    const base = { ourTag: `#${tag}`, ourTrophies: clan.clanWarTrophies, rivals, colosseum, ourP };
+    return {
+      fetchedAt: new Date().toISOString(), name: clan.name, trophies: clan.clanWarTrophies, colosseum,
+      country: loc ? Object.assign({ name: loc.name, code: loc.countryCode || null },
+        country ? Rankings.forecast(Object.assign({}, base, { list: country.items, top: 100 })) : { top: 100, current: null, outcomes: [] }) : null,
+      world: world ? Object.assign({ name: 'Mundial' }, Rankings.forecast(Object.assign({}, base, { list: world.items, top: 1000, tail: true }))) : null,
+    };
   });
 }
 
@@ -664,6 +697,30 @@ async function route(req, res) {
     return sendPdf(res, pdf, `${slug(sum)}-${stamp(sum.at)}.pdf`);
   }
   // Desempeño de los jugadores (10 semanas): informe del clan o ficha de uno
+  // Análisis en PDF del clan de casa: día anterior, última semana y último coliseo
+  const am = p.match(/^\/api\/(day|week|colosseum)\.pdf$/);
+  if (am) {
+    if (!CONFIG.clanTag) return json(req, res, 400, { error: 'El PDF necesita CLAN_TAG en el .env.' });
+    if (!CONFIG.pdfEnabled) return json(req, res, 404, { error: 'La exportación a PDF está desactivada (PDF_ENABLED=0).' });
+    const kind = am[1];
+    const tag = CONFIG.clanTag;
+    const pdf = await cached(`analysis:${kind}`, CONFIG.summaryCacheMs, async () => {
+      const war = await getWar(tag);
+      const members = (war.rosters && war.rosters[`#${tag}`]) || [];
+      let analysis;
+      try {
+        analysis = kind === 'day'
+          ? Analysis.buildDay({ tag: `#${tag}`, race: war.race, daily: dailyFor(tag), members })
+          : Analysis.buildWeek({ tag: `#${tag}`, riverlog: await getRiverlog(tag), daily: dailyFor(tag), members, colosseum: kind === 'colosseum' });
+      } catch (e) {
+        throw new ApiError(e.status || 500, e.message);
+      }
+      return renderPdf({ kind, analysis, clan: { name: war.race.clan.name, tag: `#${tag}` }, generatedAt: new Date().toISOString(), tz: CONFIG.reportTz }, 'pdf_analysis.py');
+    });
+    const names = { day: 'dia-anterior', week: 'semana', colosseum: 'coliseo' };
+    return sendPdf(res, pdf, `analisis-${names[kind]}-${new Date().toISOString().slice(0, 10)}.pdf`);
+  }
+
   if (p === '/api/players.pdf' || p === '/api/player.pdf') {
     if (!CONFIG.clanTag) return json(req, res, 400, { error: 'El PDF necesita CLAN_TAG en el .env.' });
     if (!CONFIG.pdfEnabled) return json(req, res, 404, { error: 'La exportación a PDF está desactivada (PDF_ENABLED=0).' });
@@ -699,6 +756,11 @@ async function route(req, res) {
   if (m) {
     const tag = tagFrom(req, res, m[1]);
     return tag && json(req, res, 200, await getWar(tag));
+  }
+  m = p.match(/^\/api\/ranking\/([^/]+)\/?$/);
+  if (m) {
+    const tag = tagFrom(req, res, m[1]);
+    return tag && json(req, res, 200, await getRanking(tag));
   }
   m = p.match(/^\/api\/player\/([^/]+)\/?$/);
   if (m) {

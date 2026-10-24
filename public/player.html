@@ -32,6 +32,8 @@ h2{margin:0 0 12px;font-size:15px;color:var(--w)}
 .tagb{position:absolute;top:4px;left:4px;font-size:9.5px;font-weight:700;padding:1px 6px;border-radius:999px;letter-spacing:.04em}
 .tagb.evo{background:#b46bff;color:#12001f}
 .tagb.hero{background:var(--gold);color:#1d1400}
+.tagb.champ{background:#ff9f43;color:#1d0d00}
+.cd.unk .q{aspect-ratio:5/6;display:grid;place-items:center;font-size:30px;color:var(--d)}
 .deckmeta{display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:10px;color:var(--m);font-size:12.5px}
 .deckmeta b{color:var(--t)}
 .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px}
@@ -125,7 +127,8 @@ h2{margin:0 0 12px;font-size:15px;color:var(--w)}
     var clan = v.clan ? '<a href="/c/' + esc(norm(v.clan.tag)) + '">' + esc(v.clan.name) + '</a>' + (v.clan.role ? ' · ' + esc(v.clan.role) : '') : 'sin clan';
 
     var deck = c.deck.map(function (d) {
-      return '<div class="cd">' + (d.hero ? '<span class="tagb hero">HÉROE</span>' : d.evo ? '<span class="tagb evo">EVO</span>' : '') +
+      if (d.unknown) return '<div class="cd unk" title="La API no dice qué campeón lleva y no hay ninguna partida reciente con este mazo"><span class="tagb champ">CAMPEÓN</span><div class="q">?</div><div class="n">no visible</div></div>';
+      return '<div class="cd">' + (d.champion ? '<span class="tagb champ">CAMPEÓN</span>' : d.hero ? '<span class="tagb hero">HÉROE</span>' : d.evo ? '<span class="tagb evo">EVO</span>' : '') +
         img(d.icon, d.name) + '<div class="n">Nv. ' + d.level + '</div></div>';
     }).join('');
     var tower = c.tower.filter(function (t) { return t.inUse; })[0];
@@ -184,6 +187,7 @@ h2{margin:0 0 12px;font-size:15px;color:var(--w)}
         '</div>' +
       '</div>' +
 
+      '<section class="card"><h2>Campeones</h2>' + icons(c.champions || []) + '</section>' +
       '<section class="card"><h2>Héroes desbloqueados</h2>' + icons(c.heroes) + '</section>' +
       '<section class="card"><h2>Evoluciones desbloqueadas</h2>' + icons(c.evolutions) + '</section>' +
       '<p class="muted" style="text-align:center;margin:0">Datos de ' + ago(v.fetchedAt) + '. La API guarda sus ' + b.available + ' últimas batallas; la guerra es la de su clan actual.</p>';

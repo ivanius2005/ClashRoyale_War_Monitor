@@ -96,7 +96,10 @@
     <section class="fig" id="figNews" aria-labelledby="newsTitle" hidden>
       <div class="fhead"><span class="fno">FIG. 00</span><h2 id="newsTitle">Novedades</h2>
         <div class="aside"><a class="btn-pdf" id="pdfNow" href="api/report.pdf" target="_blank" rel="noopener" hidden>
-          <svg class="ic"><use href="#i-download"/></svg>Exportar PDF</a></div></div>
+          <svg class="ic"><use href="#i-download"/></svg>Exportar PDF</a>
+          <a class="btn-pdf pdf" id="pdfDay" href="api/day.pdf" target="_blank" rel="noopener" hidden><svg class="ic"><use href="#i-download"/></svg><span>Día anterior</span></a>
+          <a class="btn-pdf pdf" id="pdfWeek" href="api/week.pdf" target="_blank" rel="noopener" hidden><svg class="ic"><use href="#i-download"/></svg><span>Semana</span></a>
+          <a class="btn-pdf pdf" id="pdfCol" href="api/colosseum.pdf" target="_blank" rel="noopener" hidden><svg class="ic"><use href="#i-download"/></svg><span>Coliseo</span></a></div></div>
       <div class="news-grid">
         <article class="news-card" id="newsReport" hidden>
           <h3><svg class="ic"><use href="#i-clock"/></svg>Informe de las <span id="reportHour">08:00</span></h3>
@@ -121,6 +124,12 @@
       <div class="river" id="river"></div>
       <div class="legend rlegend" aria-hidden="true" id="riverLegend"></div>
       <div class="tiles" id="sumKpis"></div>
+    </section>
+
+    <section class="fig" id="figRank" aria-labelledby="rankTitle" hidden>
+      <div class="fhead"><span class="fno">RANKING</span><h2 id="rankTitle">Ranking de guerra</h2></div>
+      <div class="rank-grid" id="rankGrid"></div>
+      <p class="rank-note" id="rankNote"></p>
     </section>
 
     <section class="fig" id="figPoints" aria-labelledby="ptsTitle">

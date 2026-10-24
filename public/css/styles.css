@@ -655,3 +655,18 @@ body{font-size:14.5px;line-height:1.55}
 .btn.pdf.locked{opacity:.55;cursor:not-allowed}
 .btn.pdf.locked span::after{content:" · 🔒 bloqueado"}
 .fanpolicy{margin:28px auto 8px;color:var(--dim);font-size:11.5px;text-align:center;max-width:72ch}
+
+/* Ranking de guerra */
+.rank-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px}
+.rnk{background:var(--panel-2);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+.rnk h3{margin:0;font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.rnk .dim,.rnk-t .dim{color:var(--dim)}
+.rnk-now{margin:4px 0 0;font:700 30px/1.1 var(--mono);color:var(--white)}
+.rnk-sub{margin:4px 0 0;color:var(--muted);font-size:12.5px}
+.rnk-sub b{color:var(--white)}
+.rnk-head{margin:10px 0 6px;color:var(--green);font-weight:700;font-size:14px}
+.rnk-t{width:100%;border-collapse:collapse;font-size:13px;margin-top:6px}
+.rnk-t th{font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);text-align:left;font-weight:600;padding:4px 6px;border-bottom:1px solid var(--line)}
+.rnk-t td{padding:5px 6px;border-bottom:1px solid var(--line)}
+.rnk-t td.up{color:var(--green)} .rnk-t td.down{color:var(--red)}
+.rank-note{margin:10px 0 0;color:var(--dim);font-size:11.5px}

@@ -186,7 +186,7 @@ function rosterOf(tag) {
 }
 
 /* ---------- pestañas ---------- */
-const TABS = ['live', 'players', 'kick', 'sim'];
+const TABS = ['live', 'players', 'kick', 'sim', 'top'];
 function setTab(tab) {
   state.tab = tab;
   TABS.forEach((t) => {
@@ -199,6 +199,7 @@ function setTab(tab) {
   if (tab === 'players') renderPlayers();
   if (tab === 'kick') renderKick();
   if (tab === 'sim') openSim();
+  if (tab === 'top' && state.tag && (!state.rankingAt || Date.now() - state.rankingAt > 10 * 60e3)) loadRanking(state.tag);
 }
 
 /* =========================================================
@@ -1330,14 +1331,29 @@ function saveSeen(tag, full) {
 
 // ---------- Ranking de guerra (país top 100 y mundial top 1000) con la previsión de la semana ----------
 async function loadRanking(tag) {
-  if (state.demo || !state.conf) { $('figRank').hidden = true; return; }
+  if (state.demo || !state.conf) {
+    $('rankGrid').innerHTML = '<p class="rank-note">El ranking solo está en la web de la Raspberry (necesita la API en directo).</p>';
+    return;
+  }
   try {
     const r = await getJson(`api/ranking/${encodeURIComponent(tag)}`);
     if (state.tag !== tag) return;
+    state.rankingAt = Date.now();
     renderRanking(r);
-  } catch {
-    $('figRank').hidden = true;
+  } catch (e) {
+    if (state.tag !== tag) return;
+    $('rankGrid').innerHTML = `<p class="rank-note">No se pudo cargar el ranking: ${esc(e.message)} <button type="button" class="btn" id="rankRetry">Reintentar</button></p>`;
+    $('rankRetry').addEventListener('click', () => loadRanking(tag));
   }
+}
+
+// Clanes alrededor en el ranking (5 por encima y 5 por debajo)
+function nearbyTable(x) {
+  if (!x || !x.nearby || x.nearby.length < 2) return '';
+  const rows = x.nearby.map((c) => `<tr class="${c.own ? 'own' : ''}"><td>${c.rank ? `${c.rank}º` : '—'}</td>` +
+    `<td>${esc(c.name)}${c.rival ? ' <span class="rnk-riv">en vuestra carrera</span>' : ''}</td><td>${fmt(c.trophies)}</td></tr>`).join('');
+  return `<h4 class="rnk-h4">${x.current ? 'Clanes alrededor' : `Los últimos del top ${fmt(x.top)}`}</h4>` +
+    `<table class="rnk-t rnk-near"><thead><tr><th>Puesto</th><th>Clan</th><th>Trofeos</th></tr></thead><tbody>${rows}</tbody></table>`;
 }
 
 function countryName(x) {
@@ -1364,7 +1380,7 @@ function rankBlock(x, label, where) {
     `<p class="rnk-now">${x.current ? `${x.current}º` : 'N/A'}</p>` +
     `<p class="rnk-sub">${x.current ? `${fmt(x.trophies)} trofeos de guerra` : `fuera del top ${fmt(x.top)}${x.cutoff ? ` (el último tiene ${fmt(x.cutoff)}; vosotros ${fmt(x.trophies)})` : ''}`}</p>` +
     (head ? `<p class="rnk-head">${esc(head)}</p>` : '') +
-    (rows ? `<table class="rnk-t"><thead><tr><th>Si acabáis</th><th>Trofeos</th><th>Puesto</th><th>Margen</th></tr></thead><tbody>${rows}</tbody></table>` : '') + exp + '</div>';
+    (rows ? `<table class="rnk-t"><thead><tr><th>Si acabáis</th><th>Trofeos</th><th>Puesto</th><th>Margen</th></tr></thead><tbody>${rows}</tbody></table>` : '') + exp + nearbyTable(x) + '</div>';
 }
 
 function renderRanking(r) {
@@ -1372,7 +1388,6 @@ function renderRanking(r) {
   $('rankGrid').innerHTML = rankBlock(r.country, country, r.country ? `de ${country}` : '') + rankBlock(r.world, 'Mundial', 'del mundo');
   $('rankNote').textContent = `${r.colosseum ? 'Semana de coliseo: los trofeos se multiplican por 5. ' : ''}Al acabar la semana, el 1º suma ${r.colosseum ? 100 : 20}, el 2º ${r.colosseum ? 50 : 10}, el 3º resta ${r.colosseum ? 25 : 5}, el 4º ${r.colosseum ? 50 : 10} y el 5º ${r.colosseum ? 100 : 20}. ` +
     'Se simula cómo acaban los demás clanes del top: vuestros rivales de carrera ocupan los puestos que dejáis y el resto, uno al azar. Margen: 8 de cada 10 simulaciones. N/A: fuera del top.';
-  $('figRank').hidden = false;
 }
 
 async function loadNews(tag) {

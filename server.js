@@ -314,7 +314,7 @@ function getRanking(tag) {
     const rivals = race ? (race.clans || []).map((c) => c.tag) : [];
     const own = sum && (sum.clans || []).find((c) => c.own);
     const ourP = own && own.week && Array.isArray(own.week.p) ? own.week.p : null;
-    const base = { ourTag: `#${tag}`, ourTrophies: clan.clanWarTrophies, rivals, colosseum, ourP };
+    const base = { ourTag: `#${tag}`, ourName: clan.name, ourTrophies: clan.clanWarTrophies, rivals, colosseum, ourP };
     return {
       fetchedAt: new Date().toISOString(), name: clan.name, trophies: clan.clanWarTrophies, colosseum,
       country: loc ? Object.assign({ name: loc.name, code: loc.countryCode || null },

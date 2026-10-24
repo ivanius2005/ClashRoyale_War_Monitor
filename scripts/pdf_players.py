@@ -212,6 +212,78 @@ def build_clan(data, out):
     doc.build(story)
 
 
+# ---------- Ficha completa del jugador (perfil, mazo, mazos usados y últimas batallas) ----------
+RESULT = {'win': ('Victoria', GREEN), 'loss': ('Derrota', RED), 'draw': ('Empate', MUTED)}
+
+
+def card_kind(c):
+    if c.get('unknown'):
+        return 'Campeón (no visible)'
+    if c.get('champion'):
+        return 'Campeón'
+    if c.get('hero'):
+        return 'Héroe'
+    if c.get('evo'):
+        return 'Evolución'
+    return c.get('rarity') or ''
+
+
+def profile_story(v, tz):
+    out = []
+    c = v['cards']; b = v['battles']; w = v.get('war') or {}; a = w.get('activity') or {}
+    pol = (v.get('pathOfLegend') or {}).get('current')
+    pol_txt = f"liga {pol['league']}" + (f" · {fmt(pol['trophies'])}" if pol.get('trophies') else '') if pol and (pol.get('trophies') or (pol.get('league') or 0) > 1) else '—'
+    out += [Paragraph('Perfil', S['h2']),
+            B.kpis([(fmt(v.get('expLevel')), 'nivel'),
+                    (fmt(v.get('trophies')), f"trofeos (máx. {fmt(v.get('bestTrophies'))})"),
+                    (pol_txt, 'Path of Legend'),
+                    (fmt(v.get('kingTowerLevel')), 'torre del rey'),
+                    (dec(c.get('avgLevel'), 1), f"nivel medio de cartas (máx. {c.get('top')})"),
+                    (f"{len(c.get('evolutions', []))} · {len(c.get('heroes', []))}", f"evoluciones (de {c.get('evoSlots')}) · héroes (de {c.get('heroSlots')})")], CW),
+            Spacer(1, 6)]
+    if a.get('label'):
+        out.append(Paragraph(f"<b>Guerra:</b> {esc(a['label'])}" + (f" ({dec(a['avgDecks'], 1)} mazos por semana de media)" if a.get('avgDecks') is not None else '') +
+                             (f" · <b>Últimas {len(b['list'])} batallas:</b> {b['wins']} victorias y {b['losses']} derrotas ({round(b['winRate'] * 100)} %)" if b.get('winRate') is not None else ''), S['p']))
+    # Mazo actual
+    rows = [B.hdr(['Mazo actual', 'Nivel', 'Tipo', 'Elixir'], left=1)]
+    for d in c.get('deck', []):
+        rows.append([Paragraph(esc(d['name']), S['cell']), fmt(d.get('level')) if d.get('level') else '—', card_kind(d), fmt(d.get('elixir')) if d.get('elixir') is not None else '—'])
+    t = Table(rows, colWidths=[CW - 230, 60, 110, 60])
+    st = B.base_style(len(rows), numeric_from=1)
+    for i, d in enumerate(c.get('deck', []), 1):
+        if d.get('champion') or d.get('hero') or d.get('evo'):
+            st.append(('TEXTCOLOR', (2, i), (2, i), GOLD))
+    t.setStyle(TableStyle(st))
+    out += [KeepTogether([Paragraph('Mazo actual' + (f" · elixir medio {dec(c.get('deckElixir'), 1)}" if c.get('deckElixir') else ''), S['h2']), t]), Spacer(1, 8)]
+    # Mazos usados en las últimas batallas
+    if b.get('decks'):
+        rows = [B.hdr(['Mazo', 'Partidas', 'Victorias'], left=1)]
+        for d in b['decks']:
+            rows.append([Paragraph(esc(', '.join(x['name'] for x in d['cards'])), S['cell']), str(d['n']), f"{d['wins']} ({round(d['wins'] / d['n'] * 100)} %)"])
+        t = Table(rows, colWidths=[CW - 150, 60, 90])
+        t.setStyle(TableStyle(B.base_style(len(rows), numeric_from=1)))
+        out += [KeepTogether([Paragraph(f"Mazos usados en las últimas {len(b['list'])} batallas", S['h2']), t]), Spacer(1, 8)]
+    # Últimas batallas
+    if b.get('list'):
+        rows = [B.hdr(['Fecha', 'Tipo', 'Resultado', 'Coronas', 'Rival', 'Trofeos'], left=2)]
+        for x in b['list']:
+            when = datetime.fromisoformat(x['time'].replace('Z', '+00:00')).astimezone(tz) if x.get('time') else None
+            tc = x.get('trophyChange')
+            rival = esc(x.get('opponent') or '—') + (f" <font color=\"#5E6E66\">· {esc(x['opponentClan'])}</font>" if x.get('opponentClan') else '')
+            rows.append([f"{when:%d/%m %H:%M}" if when else '—', Paragraph(esc(x['label']), S['cell']), RESULT[x['result']][0],
+                         f"{x['crowns']}–{x['oppCrowns']}", Paragraph(rival, S['cell']), (('+' if tc > 0 else '') + str(tc)) if tc else ''])
+        t = Table(rows, colWidths=[62, 120, 58, 48, CW - 336, 48], repeatRows=1)
+        st = B.base_style(len(rows), numeric_from=3)
+        st += [('ALIGN', (4, 0), (4, -1), 'LEFT'), ('ALIGN', (2, 0), (2, -1), 'LEFT')]
+        for i, x in enumerate(b['list'], 1):
+            st.append(('TEXTCOLOR', (2, i), (2, i), RESULT[x['result']][1]))
+            if x.get('trophyChange'):
+                st.append(('TEXTCOLOR', (5, i), (5, i), GREEN if x['trophyChange'] > 0 else RED))
+        t.setStyle(TableStyle(st))
+        out += [Paragraph(f"Últimas {len(b['list'])} batallas", S['h2']), t, Spacer(1, 12)]
+    return out
+
+
 def build_player(data, out):
     r = data['report']; clan = r['clan']; opts = r['kickOpts']
     p = next((x for x in r['players'] if x['tag'] == data['tag']), None)
@@ -228,6 +300,9 @@ def build_player(data, out):
                       (pct(p['decks'] / p['possible'] if p['possible'] else None), f"de mazos jugados ({p['decks']}/{p['possible']})"),
                       (tr[0].split(' ')[0] + (f" {'+' if p['trend']['delta'] > 0 else ''}{round(p['trend']['delta'] * 100)} %" if p['trend']['delta'] is not None else ''),
                        'tendencia (4 últimas vs 6 anteriores)')], CW), Spacer(1, 14)]
+    if data.get('profile'):
+        story += profile_story(data['profile'], when.tzinfo)
+        story.append(Paragraph('Guerra en el clan', S['h2']))
     story += [Paragraph('Medallas por semana', S['h2']), WeekChart(p['series'], r['clanAvg'], r['labels'], CW),
               Paragraph('Barras doradas: sus medallas. Línea discontinua: media del clan. En rojo, los mazos jugados cuando no fueron los 16. '
                         '* = semana de coliseo.', S['note']), Spacer(1, 10)]

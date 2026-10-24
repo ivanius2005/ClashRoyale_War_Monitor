@@ -625,11 +625,12 @@ function renderPlayers() {
     ['dayMiss', 'Días con fallos'], ['weekMiss', 'Semanas con fallos'], ['risk', 'Riesgo hoy'],
   ];
   const requested = (state.history && state.history.weeksRequested) || 10;
+  const plPdf = pdfOn() && isHomeClan(); // fichas PDF: solo del clan de casa
   $('plTable').innerHTML = `<thead><tr>${cols.map(([k, l]) => `<th scope="col"${k === key ? ` aria-sort="${dir > 0 ? 'ascending' : 'descending'}"` : ''}><button type="button" data-sort="${k}">${l}${k === key ? (dir > 0 ? ' ↑' : ' ↓') : ''}</button></th>`).join('')}</tr></thead>
     <tbody>${rows.map((r) => {
       const pips = Array.from({ length: DECKS }, (_, i) => `<i class="pip${i < r.used ? ' used' : ''}"></i>`).join('');
       return `<tr>
-        <td title="${esc(r.tag)}">${esc(r.name)}${!r.known ? '<span class="lowd">nuevo</span>' : r.low ? '<span class="lowd">pocos datos</span>' : ''}</td>
+        <td title="${esc(r.tag)}"><a class="plink" href="/p/${esc(String(r.tag).replace('#', ''))}">${esc(r.name)}</a>${plPdf ? `<a class="kpdf" href="api/player.pdf?${esc(kickQuery(r.tag))}" target="_blank" rel="noopener" title="Ficha PDF de ${esc(r.name)}" aria-label="Ficha PDF de ${esc(r.name)}"><svg class="ic"><use href="#i-download"/></svg></a>` : ''}${!r.known ? '<span class="lowd">nuevo</span>' : r.low ? '<span class="lowd">pocos datos</span>' : ''}</td>
         <td><span class="pips">${pips}</span></td>
         <td>${r.weeks}<span class="muted"> / ${requested}</span></td>
         <td>${r.part == null ? '—' : pct(r.part)}<span class="minibar"><i style="width:${(r.part || 0) * 100}%"></i></span></td>

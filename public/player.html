@@ -15,6 +15,8 @@ a{color:var(--g)}
 .pick button{font:inherit;font-weight:700;background:var(--g);color:#021004;border:0;border-radius:999px;padding:8px 16px;cursor:pointer}
 .pick button.alt{background:none;color:var(--g);border:1px solid var(--g)}
 .pick a{color:var(--m);font-size:12.5px;margin-left:auto}
+.pdfbtn{display:inline-block;margin-top:10px;font-weight:700;font-size:13px;color:#021004;background:var(--g);border-radius:999px;padding:7px 14px;text-decoration:none}
+.pdfbtn:hover{filter:brightness(1.1)}
 :focus-visible{outline:2px solid var(--g);outline-offset:2px}
 .card{background:var(--p);border:1px solid var(--l);border-radius:16px;padding:18px 20px}
 h1{margin:0;font-size:28px;line-height:1.15;color:var(--w);letter-spacing:-.02em;overflow-wrap:anywhere}
@@ -76,15 +78,11 @@ h2{margin:0 0 12px;font-size:15px;color:var(--w)}
 </head>
 <body>
 <div class="wrap">
-  <form class="pick" id="pick">
-    <label for="t">Buscar</label>
-    <input id="t" name="t" placeholder="#TAG de un clan o jugador" autocomplete="off" autocapitalize="characters" spellcheck="false">
-    <button value="c">Clan</button><button value="p" class="alt">Jugador</button>
-    <a href="/">← Panel inicial</a>
-  </form>
+  <div class="pick"><div id="cwSearch" style="flex:1;min-width:0"></div><a href="/">← Panel inicial</a></div>
   <main id="out" aria-live="polite"><div class="card msg">Cargando jugador…</div></main>
   <p class="fan">Contenido de fans, no afiliado ni respaldado por Supercell. Datos de la API oficial de Clash Royale.</p>
 </div>
+<script src="/js/search.js?v=0"></script>
 <script>
 (function () {
   'use strict';
@@ -96,14 +94,7 @@ h2{margin:0 0 12px;font-size:15px;color:var(--w)}
   var norm = function (v) { return String(v || '').toUpperCase().replace(/[^0-9A-Z]/g, '').replace(/O/g, '0'); };
   var TAG_RE = /^[0289PYLQGRJCUV]{3,12}$/;
 
-  $('pick').addEventListener('submit', function (e) {
-    e.preventDefault();
-    var k = (e.submitter && e.submitter.value) || 'p';
-    var t = norm($('t').value);
-    if (TAG_RE.test(t)) location.href = '/' + k + '/' + t;
-    else { $('t').setCustomValidity('Tag no válido'); $('t').reportValidity(); }
-  });
-  $('t').addEventListener('input', function () { $('t').setCustomValidity(''); });
+  CWSearch.mount($('cwSearch'), { mode: 'p' });
 
   var tag = norm(decodeURIComponent(location.pathname.split('/')[2] || ''));
   if (!TAG_RE.test(tag)) { $('out').innerHTML = '<div class="card msg err">Tag de jugador no válido.</div>'; return; }
@@ -162,7 +153,7 @@ h2{margin:0 0 12px;font-size:15px;color:var(--w)}
         '<h1>' + esc(v.name) + '</h1>' +
         '<div class="sub">' + esc(v.tag) + ' · ' + clan + '</div>' +
         '<div class="sub"><b>' + fmt(v.trophies) + '</b> trofeos (máx. ' + fmt(v.bestTrophies) + ')' + (v.arena ? ' · ' + esc(v.arena) : '') + polTxt + '</div>' +
-      '</div><div class="lv" title="Nivel de experiencia"><span>Nivel</span><b>' + fmt(v.expLevel) + '</b></div></div>' +
+      '<div id="pdfSlot"></div></div><div class="lv" title="Nivel de experiencia"><span>Nivel</span><b>' + fmt(v.expLevel) + '</b></div></div>' +
       '<div class="deck" aria-label="Mazo actual">' + deck + '</div>' +
       '<div class="deckmeta"><span>Mazo actual · elixir medio <b>' + dec(c.deckElixir, 1) + '</b></span>' + (tower ? '<span>Torre: <b>' + esc(tower.name) + '</b> (nv. ' + tower.level + ')</span>' : '') + (c.favourite ? '<span>Carta favorita: <b>' + esc(c.favourite) + '</b></span>' : '') + '</div></section>' +
 
@@ -195,7 +186,15 @@ h2{margin:0 0 12px;font-size:15px;color:var(--w)}
 
   fetch('/api/player/' + tag).then(function (r) {
     return r.json().then(function (d) { if (!r.ok) throw new Error(d.error || ('Error ' + r.status)); return d; });
-  }).then(render).catch(function (e) {
+  }).then(function (v) {
+    render(v);
+    // Ficha en PDF: solo si el jugador es del clan de casa del servidor
+    fetch('/api/config').then(function (r) { return r.json(); }).then(function (conf) {
+      if (conf && conf.pdf && conf.homeTag && v.clan && norm(v.clan.tag) === norm(conf.homeTag) && $('pdfSlot')) {
+        $('pdfSlot').innerHTML = '<a class="pdfbtn" href="/api/player.pdf?tag=%23' + tag + '" target="_blank" rel="noopener">⤓ Ficha en PDF</a>';
+      }
+    }).catch(function () { /* sin PDF */ });
+  }).catch(function (e) {
     $('out').innerHTML = '<div class="card msg err">' + esc(e.message) + '</div>';
   });
 })();

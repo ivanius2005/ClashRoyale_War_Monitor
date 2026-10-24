@@ -624,8 +624,7 @@ const ACCESS_PAGE = `<!doctype html><html lang="es"><meta charset="utf-8"><meta 
 // Página de un clan: la tarjeta a pantalla completa, con buscador de clan y aviso de contenido de fans
 function clanPage(tag, home) {
   const card = fs.readFileSync(path.join(__dirname, 'deploy', 'dashboard-card.html'), 'utf8').replace(/^<!--[\s\S]*?-->\s*/, '');
-  const search = CONFIG.anyClan ? `<form class="pick" action="/c/" onsubmit="event.preventDefault();var k=(event.submitter&&event.submitter.value)||'c';var t=this.t.value.toUpperCase().replace(/[^0-9A-Z]/g,'').replace(/O/g,'0');if(/^[0289PYLQGRJCUV]{3,12}$/.test(t))location.href='/'+k+'/'+t;else this.t.setCustomValidity('Tag no válido'),this.t.reportValidity();">
-  <label for="t">Buscar</label><input id="t" name="t" placeholder="#TAG de un clan o jugador" autocomplete="off" autocapitalize="characters" spellcheck="false" oninput="this.setCustomValidity('')"><button value="c">Clan</button><button value="p" class="alt">Jugador</button>${CONFIG.clanTag && !home ? `<a href="/">Volver a #${CONFIG.clanTag}</a>` : ''}</form>` : '';
+  const search = CONFIG.anyClan ? `<div class="pick"><div id="cwSearch" class="pick-s"></div>${CONFIG.clanTag && !home ? `<a href="/">← Volver a #${CONFIG.clanTag}</a>` : ''}</div><script src="/js/search.js?v=${getAssetVersion()}"></script><script>CWSearch.mount(document.getElementById('cwSearch'))</script>` : '';
   return `<!doctype html>
 <html lang="es"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -637,6 +636,7 @@ function clanPage(tag, home) {
 .pick button{font:inherit;font-weight:700;background:#00ff41;color:#021004;border:0;border-radius:999px;padding:8px 16px;cursor:pointer}
 .pick button.alt{background:none;color:#00ff41;border:1px solid #00ff41}
 .pick a{color:#9bb0a0;font-size:12.5px;margin-left:auto}
+.pick-s{flex:1;min-width:0}
 .fan{max-width:1100px;color:#6e8474;font-size:11.5px;text-align:center;margin:0}
 .pick input:focus-visible,.pick button:focus-visible{outline:2px solid #00ff41;outline-offset:2px}</style>
 </head><body>${search}<script>window.CW_CARD_TAG=${JSON.stringify(tag || '')};window.CW_CARD_HOME=${home ? 'true' : 'false'};</script>${card}
@@ -669,7 +669,8 @@ async function route(req, res) {
   if (mp) {
     const t = normalizeTag(decodeURIComponent(mp[1]));
     if (!TAG_RE.test(t) || (CONFIG.clanTag && !CONFIG.anyClan)) return send(res, 302, 'text/plain', '', { Location: '/' });
-    return send(res, 200, 'text/html; charset=utf-8', fs.readFileSync(path.join(__dirname, 'public', 'player.html')), { 'Cache-Control': 'no-store' });
+    const html = fs.readFileSync(path.join(__dirname, 'public', 'player.html'), 'utf8').replace(/(\.js)\?v=[0-9a-z]+/g, `$1?v=${getAssetVersion()}`);
+    return send(res, 200, 'text/html; charset=utf-8', html, { 'Cache-Control': 'no-store' });
   }
   const mc = p.match(/^\/c\/([^/]+)\/?$/); // página de cualquier clan: /c/LVR980LQ
   if (mc) {
@@ -759,7 +760,9 @@ async function route(req, res) {
       const tag = CONFIG.clanTag;
       const report = buildPlayersReport(await getWar(tag), await getHistory(tag), opts);
       if (one && !report.players.some((x) => x.tag === `#${ptag}`)) throw new ApiError(404, 'Ese jugador no está en el clan.');
-      return renderPdf({ mode: one ? 'player' : 'clan', report, tag: `#${ptag}`, generatedAt: report.generatedAt, tz: CONFIG.reportTz }, 'pdf_players.py');
+      // Ficha completa del jugador (perfil, mazo, últimas batallas): si la API falla, el PDF sale sin esa parte
+      const profile = one ? await getPlayer(ptag).catch(() => null) : null;
+      return renderPdf({ mode: one ? 'player' : 'clan', report, profile, tag: `#${ptag}`, generatedAt: report.generatedAt, tz: CONFIG.reportTz }, 'pdf_players.py');
     });
     const z = (n) => String(n).padStart(2, '0'); const d = new Date();
     return sendPdf(res, pdf, `${one ? `jugador-${ptag.toLowerCase()}` : 'jugadores'}-${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}.pdf`);

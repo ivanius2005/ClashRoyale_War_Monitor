@@ -679,3 +679,7 @@ body{font-size:14.5px;line-height:1.55}
   .tabs{width:100%;gap:2px;padding:3px}
   .tabs button{flex:1 1 0;min-width:0;padding:7px 2px;font-size:11.5px;letter-spacing:-.01em}
 }
+
+/* Jugadores: nombre enlazado a su ficha */
+.plink{color:inherit;text-decoration:none;border-bottom:1px dotted var(--dim)}
+.plink:hover{color:var(--green);border-bottom-color:var(--green)}

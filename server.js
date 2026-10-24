@@ -34,6 +34,9 @@ const CONFIG = {
   host,
   apiBase: (process.env.CR_API_BASE || 'https://proxy.royaleapi.dev/v1').replace(/\/+$/, ''),
   apiKey: (process.env.CR_API_KEY || '').trim(),
+  // Respaldo: si la API principal no responde o rechaza la clave (p. ej. la IP de casa cambió), se prueba esta otra
+  fallbackBase: (process.env.CR_API_BASE_FALLBACK || '').trim().replace(/\/+$/, ''),
+  fallbackKey: (process.env.CR_API_KEY_FALLBACK || '').trim(),
   liveCacheMs: Math.max(5, Number(process.env.CACHE_SECONDS) || 30) * 1000,
   historyCacheMs: Math.max(60, Number(process.env.HISTORY_CACHE_SECONDS) || 600) * 1000,
   historyWeeks: Math.min(20, Math.max(1, Number(process.env.HISTORY_WEEKS) || 10)),
@@ -179,19 +182,37 @@ function guardClan(tag, key = `war:${tag}`) {
   admitted.push(now);
 }
 
+function switchToFallback(why) {
+  if (Date.now() >= useFallbackUntil) console.warn(`API principal (${CONFIG.apiBase}) ${why}: uso el respaldo (${CONFIG.fallbackBase}) durante 10 min.`);
+  useFallbackUntil = Date.now() + 10 * 60e3;
+  stats.fallback = (stats.fallback || 0) + 1;
+}
+
+// ¿Se usa la API de respaldo? Tras un fallo de la principal se usa el respaldo unos minutos y luego se vuelve a probar
+let useFallbackUntil = 0;
+const hasFallback = () => !!(CONFIG.fallbackBase && CONFIG.fallbackKey);
+
 async function cr(pathname, retry = true) {
   stats.api += 1;
+  const fb = hasFallback() && Date.now() < useFallbackUntil;
+  const base = fb ? CONFIG.fallbackBase : CONFIG.apiBase;
+  const key = fb ? CONFIG.fallbackKey : CONFIG.apiKey;
+  // Si hay respaldo, la principal tiene menos tiempo para responder (para no hacer esperar)
+  const timeout = hasFallback() && !fb ? 8_000 : 15_000;
   let res;
   try {
-    res = await fetch(CONFIG.apiBase + pathname, {
-      headers: { Authorization: `Bearer ${CONFIG.apiKey}`, Accept: 'application/json' },
-      signal: AbortSignal.timeout(15_000),
+    res = await fetch(base + pathname, {
+      headers: { Authorization: `Bearer ${key}`, Accept: 'application/json' },
+      signal: AbortSignal.timeout(timeout),
     });
   } catch {
+    if (hasFallback() && !fb) { switchToFallback('no responde'); return cr(pathname, retry); }
     if (retry) { await new Promise((r) => setTimeout(r, 800)); return cr(pathname, false); }
     throw new ApiError(503, 'No se pudo contactar con la API de Clash Royale (sin conexión o tiempo agotado). Prueba en un minuto.');
   }
   if (res.ok) return res.json();
+  // Clave rechazada por la principal (403: p. ej. la IP de casa ya no es la de la clave): probar el respaldo
+  if (res.status === 403 && hasFallback() && !fb) { switchToFallback('rechaza la clave (403)'); return cr(pathname, retry); }
   // Fallo puntual del proxy o de la API (5xx): un reintento antes de rendirse
   if (res.status >= 500 && retry) { await new Promise((r) => setTimeout(r, 800)); return cr(pathname, false); }
 
@@ -663,7 +684,8 @@ async function route(req, res) {
     const hour = Date.now() - 3600e3;
     return json(req, res, 200, {
       desde: new Date(stats.since).toISOString(), peticionesApi: stats.api, erroresApi: stats.apiErrors, errores429: stats.api429,
-      cache: { aciertos: stats.cacheHits, fallos: stats.cacheMisses, datosDeReserva: stats.staleServed }, clanesRechazados: stats.rejected,
+      cache: { aciertos: stats.cacheHits, fallos: stats.cacheMisses, datosDeReserva: stats.staleServed },
+      api: { principal: CONFIG.apiBase, respaldo: CONFIG.fallbackBase || null, usandoRespaldo: hasFallback() && Date.now() < useFallbackUntil, cambiosAlRespaldo: stats.fallback || 0 }, clanesRechazados: stats.rejected,
       clanesUltimaHora: [...stats.clans.values()].filter((t) => t > hour).length, enCache: caches.size, tagsInexistentes: notFound.size,
     });
   }

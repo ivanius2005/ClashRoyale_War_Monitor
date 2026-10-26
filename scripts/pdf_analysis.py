@@ -165,13 +165,83 @@ def build_week(data, a, doc, story):
     story.append(Paragraph(note, S['note']))
 
 
+APT_COLOR = {'bien': GREEN, 'vigilar': AMBER, 'expulsar': RED, 'nuevo': MUTED}
+
+
+def build_playerwar(data, a, doc, story):
+    e = a.get('evaluation') or {}
+    home = a.get('home') or {}
+    known = [w for w in a['weeks'] if w['known']]
+    played = [w for w in known if w['decks'] > 0]
+    hn = home.get('name') or 'el clan'
+    col = APT_COLOR.get(e.get('verdict'), MUTED)
+    verdict = e.get('apt') or 'Sin datos suficientes'
+    story.append(Paragraph(f'Evaluación para {esc(hn)}', S['h2']))
+    story.append(Paragraph(f'<font size="20" color="{col.hexval().replace("0x", "#")}"><b>{esc(verdict)}</b></font>', S['p']))
+    story.append(Spacer(1, 6))
+    avg_m = sum(w['medals'] for w in known) / len(known) if known else None
+    avg_d = sum(w['decks'] for w in known) / len(known) if known else None
+    story.append(B.kpis([
+        (dec(e['score'], 2) if e.get('score') is not None else '—', 'nota (expulsar < ' + dec((e.get('rules') or {}).get('threshold', -0.5), 1) + ')'),
+        (fmt(round(avg_m)) if avg_m is not None else '—', 'medallas por semana'),
+        (dec(avg_d, 1) if avg_d is not None else '—', 'mazos por semana (de 16)'),
+        (f"{a['known']} de 10", 'semanas con datos'),
+    ], CW))
+    story.append(Spacer(1, 8))
+    parts = []
+    if home.get('avgMedals') and avg_m is not None:
+        diff = (avg_m - home['avgMedals']) / home['avgMedals']
+        parts.append(f"El jugador medio de {esc(hn)} hace {fmt(round(home['avgMedals']))} medallas y {dec(home['avgDecks'], 1)} mazos por semana; "
+                     f"este jugador, un {dec(abs(diff) * 100, 0)} % {'más' if diff >= 0 else 'menos'} de medallas.")
+    if a['known'] < 10:
+        parts.append(f"Faltan {10 - a['known']} semanas: la API oficial no da el historial de un jugador, solo el de cada clan, "
+                     "y no se sabe en qué clan estuvo esas semanas.")
+    if e.get('verdict') == 'nuevo' or not e:
+        parts.append('Con menos de 4 semanas de datos no se puede evaluar.')
+    if parts:
+        story.append(Paragraph(' '.join(parts), S['call']))
+    story.append(Paragraph('Últimas 10 semanas de guerra', S['h2']))
+    rows = [B.hdr(['Semana', 'Clan', 'Mazos (de 16)', 'Medallas', 'Por mazo'], left=2)]
+    for w in a['weeks']:
+        lab = (w.get('label') or w['date']) + (' · coliseo' if w.get('colosseum') else '')
+        if w['known']:
+            rows.append([lab, Paragraph(esc(w['clan']['name']), S['cell']), str(w['decks']), fmt(w['medals']), fmt(round(w['medals'] / w['decks'])) if w['decks'] else '—'])
+        else:
+            rows.append([lab, Paragraph('<font color="#5E6E66">sin datos</font>', S['cell']), '—', '—', '—'])
+    t = Table(rows, colWidths=[120, CW - 120 - 80 - 70 - 60, 80, 70, 60])
+    st = B.base_style(len(rows), numeric_from=2)
+    for i, w in enumerate(a['weeks'], 1):
+        if w['known']:
+            st.append(('TEXTCOLOR', (2, i), (2, i), GREEN if w['decks'] >= 16 else (RED if w['decks'] == 0 else AMBER)))
+            st.append(('FONTNAME', (2, i), (2, i), 'BodyB'))
+        else:
+            st.append(('TEXTCOLOR', (0, i), (-1, i), MUTED))
+    t.setStyle(TableStyle(st))
+    story.append(t)
+    r = e.get('rules') or {}
+    if r:
+        c = r['coef']
+        story.append(Spacer(1, 8))
+        story.append(Paragraph('Cómo se calcula', S['h2']))
+        story.append(Paragraph(
+            f"Son los requisitos de {esc(hn)} en «Expulsiones» (valores por defecto). Nota = media de los días de guerra (los 4 mazos {dec(c[4], 2)}; 3: {dec(c[3], 2)}; "
+            f"2: {dec(c[2], 2)}; 1: {dec(c[1], 2)}; ninguno: {dec(c[0], 2)}) + 0,5 + (medallas por semana − {fmt(r['medalTarget'])}) × 0,001. "
+            f"Bien (apto) por encima de {dec(r['watchUpTo'], 1)}; a revisar entre {dec(r['threshold'], 1)} y {dec(r['watchUpTo'], 1)}; "
+            f"no apto por debajo de {dec(r['threshold'], 1)}. Hacen falta {r['minWeeks']} semanas con datos. "
+            f"Nota de mazos: {dec(e.get('deckScore'), 2)} · nota de medallas: {dec(e.get('medalScore'), 2)}.", S['note']))
+
+
 def build(data, out):
     tz = ZoneInfo(data.get('tz') or 'Europe/Madrid')
     when = when_of(data['generatedAt'], tz)
     a = data['analysis']
     clan = data['clan']
-    kind = a['kind']
-    if kind == 'day':
+    kind = data.get('kind') or a['kind']
+    if kind == 'playerwar':
+        cl = a.get('clan') or {}
+        sub = 'Historial de guerra · últimas 10 semanas'
+        line2 = f"{a['tag']}  |  {('Clan actual: ' + cl['name']) if cl.get('name') else 'Sin clan'}  |  Generado el {when:%d/%m/%Y %H:%M}"
+    elif kind == 'day':
         start = when_of(a['start'], tz)
         sub = 'Análisis del día anterior'
         line2 = f"{clan['tag']}  |  Día {a['day']} de batalla, semana {a['week']} ({date_txt(start)})  |  Generado el {when:%d/%m/%Y %H:%M}"
@@ -181,7 +251,7 @@ def build(data, out):
         line2 = f"{clan['tag']}  |  {a['label']}, terminada el {date_txt(end)}  |  Generado el {when:%d/%m/%Y %H:%M}"
     doc = P.page_setup(out, clan['name'], sub, line2, when, clan)
     story = [NextPageTemplate('Later')]
-    (build_day if kind == 'day' else build_week)(data, a, doc, story)
+    {'day': build_day, 'playerwar': build_playerwar}.get(kind, build_week)(data, a, doc, story)
     doc.build(story)
 
 

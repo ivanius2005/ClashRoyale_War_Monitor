@@ -683,3 +683,20 @@ body{font-size:14.5px;line-height:1.55}
 /* Jugadores: nombre enlazado a su ficha */
 .plink{color:inherit;text-decoration:none;border-bottom:1px dotted var(--dim)}
 .plink:hover{color:var(--green);border-bottom-color:var(--green)}
+
+/* ===== Móvil: nada se sale de la pantalla ===== */
+.fhead .aside{flex-wrap:wrap;justify-content:flex-end}
+@media (max-width:560px){
+  /* Cabecera: logo y «Panel inicial» en una fila, «actualizado» debajo */
+  .top{flex-wrap:wrap;gap:8px;align-items:center}
+  .brand{gap:8px 10px;flex-wrap:nowrap;min-width:0;flex:1}
+  .brand .app{display:none}
+  .top .btn.back{margin-left:auto;white-space:nowrap}
+  .top .live{flex-basis:100%;font-size:12px}
+  /* Novedades: los botones de PDF ocupan su propia fila, de dos en dos */
+  .fhead .aside{margin-left:0;flex-basis:100%;display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .fhead .aside > [hidden]{display:none}
+  .fhead .aside .btn-pdf,.fhead .aside .btn{justify-content:center;text-align:center;padding:7px 8px;font-size:12.5px}
+  /* Tablas anchas: se desplazan dentro de su recuadro, nunca la página */
+  .fig{overflow-x:clip}
+}

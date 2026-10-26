@@ -210,7 +210,12 @@ async function cr(pathname, retry = true) {
     if (retry) { await new Promise((r) => setTimeout(r, 800)); return cr(pathname, false); }
     throw new ApiError(503, 'No se pudo contactar con la API de Clash Royale (sin conexión o tiempo agotado). Prueba en un minuto.');
   }
-  if (res.ok) return res.json();
+  if (res.ok) {
+    const data = await res.json();
+    // Cada historial de clan que pasa por aquí alimenta el índice de guerra por jugador
+    if (pathname.includes('/riverracelog')) { try { warIndex.ingest(data); } catch (e) { console.error('Índice de guerra:', e.message); } }
+    return data;
+  }
   // Clave rechazada por la principal (403: p. ej. la IP de casa ya no es la de la clave): probar el respaldo
   if (res.status === 403 && hasFallback() && !fb) { switchToFallback('rechaza la clave (403)'); return cr(pathname, retry); }
   // Fallo puntual del proxy o de la API (5xx): un reintento antes de rendirse
@@ -275,6 +280,52 @@ function raceClanTags(race) {
 // Ficha de un jugador: perfil + últimas batallas + guerra de su clan actual (esta semana y las 10 últimas)
 const PlayerView = require('./lib/player-view');
 const Analysis = require('./lib/analysis');
+const CWSim = require('./public/js/sim.js');
+const { WarIndex, lastWeekKeys } = require('./lib/war-index');
+const warIndex = new WarIndex(path.join(CONFIG.dataDir, 'war-index.json'));
+setInterval(() => warIndex.save(), 10 * 60e3).unref();
+process.on('SIGTERM', () => { warIndex.save(); process.exit(0); });
+
+// Historial de guerra de un jugador en las 10 últimas semanas, en cualquier clan, y si sería apto para el clan de casa
+const APT = { bien: 'Apto', vigilar: 'Apto (a revisar)', expulsar: 'No apto', nuevo: 'Sin datos suficientes' };
+function getPlayerWar(tag) {
+  return cached(`pwar:${tag}`, CONFIG.historyCacheMs, async () => {
+    const view = await getPlayer(tag);
+    // Historiales de su clan actual y de los clanes con los que aparece en sus batallas de guerra recientes
+    const clans = [...new Set([view.clan && view.clan.tag, ...((view.battles && view.battles.warClans) || []).map((c) => c.tag)].filter(Boolean))].slice(0, 4);
+    await Promise.all(clans.map((c) => getRiverlog(normalizeTag(c)).catch(() => null)));
+    const entries = warIndex.get(`#${tag}`);
+    const weeks = lastWeekKeys(10).map((k) => {
+      const e = entries[k];
+      const meta = warIndex.weeks[k] || {};
+      return e ? { date: k, label: meta.label || null, colosseum: !!meta.colosseum, known: true, clan: { tag: e[0], name: e[1] }, decks: e[2], medals: e[3] }
+        : { date: k, label: meta.label || null, colosseum: !!meta.colosseum, known: false };
+    });
+    const known = weeks.filter((w) => w.known);
+    // Nota con la fórmula y los valores por defecto de «Expulsiones» del clan de casa
+    let evaluation = null;
+    if (known.length) {
+      const hist = CWSim.prepareHistory(known.map((w) => ({ medals: 1, createdDate: `${w.date.replace(/-/g, '')}T100000.000Z`, players: [[`#${tag}`, w.decks, w.medals]] })));
+      const row = CWSim.kickReport(hist, [{ tag: `#${tag}`, name: view.name }], { weeks: known.length }).rows[0];
+      evaluation = { verdict: row.verdict, apt: APT[row.verdict] || row.verdict, score: row.score, deckScore: row.deckScore, medalScore: row.medalScore,
+        medalsPerWeek: row.medalsPerWeek, weeks: known.length,
+        rules: { medalTarget: CWSim.KICK.medalTarget, threshold: CWSim.KICK.threshold, watchUpTo: CWSim.KICK.threshold + CWSim.KICK.watchMargin, minWeeks: CWSim.KICK.minWeeks, coef: CWSim.DEFAULT_DECK_COEF } };
+    }
+    // Referencia: media por jugador del clan de casa en esas semanas (quien jugó al menos un mazo)
+    let home = null;
+    if (CONFIG.clanTag) {
+      const log = await getRiverlog(CONFIG.clanTag).catch(() => null);
+      const rows = [];
+      for (const it of (log && log.items) || []) {
+        const st = (it.standings || []).find((s) => s.clan && s.clan.tag === `#${CONFIG.clanTag}`);
+        for (const p of (st && st.clan.participants) || []) if (p.decksUsed > 0) rows.push(p);
+        if (st && !home) home = { name: st.clan.name };
+      }
+      if (home && rows.length) Object.assign(home, { tag: `#${CONFIG.clanTag}`, avgMedals: rows.reduce((s, p) => s + p.fame, 0) / rows.length, avgDecks: rows.reduce((s, p) => s + p.decksUsed, 0) / rows.length });
+    }
+    return { fetchedAt: new Date().toISOString(), tag: view.tag, name: view.name, clan: view.clan, weeks, known: known.length, evaluation, home };
+  });
+}
 function getPlayer(tag) {
   return cached(`player:${tag}`, Math.max(60e3, CONFIG.liveCacheMs), async () => {
     const profile = await cr(`/players/%23${tag}`).catch((e) => {
@@ -310,7 +361,8 @@ function getRanking(tag) {
       getSummary(tag).catch(() => null),
     ]);
     const race = war && war.race;
-    const colosseum = !!race && race.periodType === 'colosseum';
+    // Coliseo (×5): lo dice la API en los días de batalla; en los de entrenamiento se sabe por la fecha
+    const colosseum = !!race && (race.periodType === 'colosseum' || (race.periodType !== 'warDay' && Rankings.isColosseumWeek()));
     const rivals = race ? (race.clans || []).map((c) => c.tag) : [];
     const own = sum && (sum.clans || []).find((c) => c.own);
     const ourP = own && own.week && Array.isArray(own.week.p) ? own.week.p : null;
@@ -724,6 +776,19 @@ async function route(req, res) {
     return sendPdf(res, pdf, `${slug(sum)}-${stamp(sum.at)}.pdf`);
   }
   // Desempeño de los jugadores (10 semanas): informe del clan o ficha de uno
+  // Historial de guerra de un jugador (cualquiera) en PDF, con su evaluación para el clan de casa
+  if (p === '/api/player-war.pdf') {
+    if (!CONFIG.pdfEnabled) return json(req, res, 404, { error: 'La exportación a PDF está desactivada (PDF_ENABLED=0).' });
+    const tag = normalizeTag(url.searchParams.get('tag') || '');
+    if (!TAG_RE.test(tag)) return json(req, res, 400, { error: 'Tag de jugador no válido.' });
+    guardClan(tag, `player:${tag}`);
+    const pdf = await cached(`pwarpdf:${tag}`, CONFIG.historyCacheMs, async () => {
+      const war = await getPlayerWar(tag);
+      return renderPdf({ kind: 'playerwar', analysis: war, clan: { name: war.name, tag: war.tag }, generatedAt: new Date().toISOString(), tz: CONFIG.reportTz }, 'pdf_analysis.py');
+    });
+    return sendPdf(res, pdf, `historial-guerra-${tag.toLowerCase()}.pdf`);
+  }
+
   // Análisis en PDF del clan de casa: día anterior, última semana y último coliseo
   const am = p.match(/^\/api\/(day|week|colosseum)\.pdf$/);
   if (am) {
@@ -790,6 +855,13 @@ async function route(req, res) {
   if (m) {
     const tag = tagFrom(req, res, m[1]);
     return tag && json(req, res, 200, await getRanking(tag));
+  }
+  m = p.match(/^\/api\/player-war\/([^/]+)\/?$/);
+  if (m) {
+    const tag = normalizeTag(decodeURIComponent(m[1]));
+    if (!TAG_RE.test(tag)) return json(req, res, 400, { error: 'Tag de jugador no válido.' });
+    guardClan(tag, `player:${tag}`);
+    return json(req, res, 200, await getPlayerWar(tag));
   }
   m = p.match(/^\/api\/player\/([^/]+)\/?$/);
   if (m) {

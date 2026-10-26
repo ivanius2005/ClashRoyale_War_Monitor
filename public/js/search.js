@@ -7,7 +7,7 @@
   var VALID = /^#?[0289PYLQGRJCUVO]+$/i; // letras que puede tener un tag (la O se toma como 0)
   var norm = function (v) { return String(v || '').toUpperCase().replace(/[^0-9A-Z]/g, '').replace(/O/g, '0'); };
   var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
-  var fmt = function (n) { return n == null ? '—' : Number(n).toLocaleString('es-ES'); };
+  var fmt = function (n) { return n == null || !isFinite(n) ? '—' : String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, '.'); };
 
   var CSS = '' +
     '.cws{display:flex;flex-direction:column;gap:8px;width:100%}' +

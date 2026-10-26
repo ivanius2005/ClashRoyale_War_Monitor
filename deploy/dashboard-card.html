@@ -57,6 +57,20 @@
     .cwcard .cw-pdf:hover{background:var(--g);color:#021004!important}
     .cwcard .cw-month{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:8px}
     .cwcard .cw-m{background:var(--p2);border:1px solid var(--l);border-radius:10px;padding:9px 11px;min-width:0}
+    .cwcard .cw-mall{margin-top:8px}
+    .cwcard .cw-mscroll{overflow-x:auto;margin-top:8px}
+    .cwcard .cw-mt{width:100%;border-collapse:collapse;font-size:12.5px}
+    .cwcard .cw-mt th{font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--m);text-align:left;font-weight:600;padding:5px 6px;border-bottom:1px solid var(--l);white-space:nowrap}
+    .cwcard .cw-mt td{padding:5px 6px;border-bottom:1px solid var(--l);white-space:nowrap}
+    .cwcard .cw-mt td.n{text-align:right}
+    .cwcard .cw-mt td.who{white-space:normal;min-width:8em;color:var(--w)}
+    .cwcard .cw-mv{display:inline-flex;gap:3px;align-items:center}
+    .cwcard .cw-mt td,.cwcard .cw-mt th{text-align:left}
+    .cwcard .cw-mt td.n,.cwcard .cw-mt th.n{text-align:right}
+    .cwcard .cw-mv i{font-style:normal;font-size:11px;min-width:1.7em;text-align:center;border-radius:4px;padding:1px 2px;background:var(--p3)}
+    .cwcard .cw-mv i.up{color:var(--g)}
+    .cwcard .cw-mv i.dn{color:var(--r)}
+    .cwcard .cw-mv i.eq{color:var(--d)}
     .cwcard .cw-m span{display:block;color:var(--m);font-size:11px;text-transform:uppercase;letter-spacing:.06em}
     .cwcard .cw-m strong{display:block;font-size:16px;margin-top:3px;color:var(--w);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
     .cwcard .cw-m small{display:block;color:var(--m);font-size:11.5px}
@@ -151,6 +165,7 @@
 
   <h4>Miembro del mes · quien más medallas suma en la temporada</h4>
   <div class="cw-month" id="cwMonth"></div>
+  <details class="cw-mall" id="cwMonthAll" hidden><summary id="cwMonthAllSum">Ver todos los miembros</summary><div class="cw-mscroll" id="cwMonthTable"></div></details>
 
   </div>
 
@@ -374,6 +389,16 @@
           + `<small>${fmt(lead.medals)} medallas · ${lead.decks} mazos${lead.member === false ? ' · ya no está' : ''} · ${esc(sub)}</small>`
           + `<ol start="2">${rest.slice(0, 2).map((e) => `<li>${esc(e.name)} · ${fmt(e.medals)}</li>`).join('')}</ol></div>`;
       };
+      // Todos los miembros actuales, con lo que han subido (▲) o bajado (▼) tras cada día de guerra de la temporada
+      const tl = m && m.current && m.current.timeline;
+      $('cwMonthAll').hidden = !(tl && tl.members && tl.members.length);
+      if (tl && tl.members && tl.members.length) {
+        $('cwMonthAllSum').textContent = `Ver los ${tl.members.length} miembros del clan, día a día`;
+        const mv = (x) => x.delta == null ? '' : `<i class="${x.delta > 0 ? 'up' : x.delta < 0 ? 'dn' : 'eq'}" title="${esc(x.label)}: ${x.rank}º${x.delta ? ` (${x.delta > 0 ? 'sube' : 'baja'} ${Math.abs(x.delta)})` : ' (igual)'}">${x.delta > 0 ? `▲${x.delta}` : x.delta < 0 ? `▼${-x.delta}` : '–'}</i>`;
+        $('cwMonthTable').innerHTML = `<table class="cw-mt"><thead><tr><th>#</th><th>Jugador</th><th class="n">Medallas</th><th class="n">Mazos</th><th title="${tl.points.slice(1).map(esc).join(' → ')}">Cambios día a día</th></tr></thead><tbody>`
+          + tl.members.map((x) => `<tr><td>${x.rank}º</td><td class="who">${esc(x.name)}</td><td class="n">${fmt(x.medals)}</td><td class="n">${x.decks}</td><td><span class="cw-mv">${x.moves.map(mv).join('')}</span></td></tr>`).join('')
+          + '</tbody></table>';
+      }
       $('cwMonth').innerHTML = !m ? '<div class="cw-m"><small>Sin historial suficiente.</small></div>'
         : box(m.current, `Temporada ${m.current.seasonId} · en curso`, `${m.current.weeksCounted} sem.`)
         + box(m.previous, `Temporada ${m.previous.seasonId} · terminada`, m.previous.complete ? 'final' : `${m.previous.weeksCounted} sem. en el historial`);

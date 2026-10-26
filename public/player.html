@@ -259,7 +259,9 @@ h2{margin:0 0 12px;font-size:15px;color:var(--w)}
     $('pWar').innerHTML =
       '<section class="card"><div class="wtop"><div><div class="k">Evaluación para ' + esc(home.name || 'el clan') + '</div>' +
         '<div class="verdict ' + cls + '">' + esc(e.apt || 'Sin datos suficientes') + '</div>' +
-        '<div class="sub">' + (e.score != null ? 'Nota <b>' + dec(e.score, 2) + '</b> · ' : '') + d.known + ' de 10 semanas con datos</div></div>' +
+        '<div class="sub">' + (e.score != null ? 'Nota <b>' + dec(e.score, 2) + '</b> · ' : '') +
+        (e.reliability && e.reliability.index != null ? 'Fiabilidad <b class="' + ({ Alta: 'good', Media: 'warn', Baja: 'bad' }[e.reliability.label] || '') + '">' + e.reliability.index + ' · ' + esc(e.reliability.label) + '</b> · ' : '') +
+        d.known + ' de 10 semanas con datos</div></div>' +
         '<a class="pdfbtn" href="/api/player-war.pdf?tag=%23' + tag + '" target="_blank" rel="noopener">⤓ Historial en PDF</a></div>' + cmp + '</section>' +
       '<section class="card"><h2>Últimas 10 semanas de guerra</h2><div class="wscroll"><table class="wt"><thead><tr><th>Semana</th><th>Clan</th><th style="text-align:right">Mazos</th><th style="text-align:right">Medallas</th><th style="text-align:right">Por mazo</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
         (d.known < 10 ? '<p class="muted" style="margin:10px 0 0">«Sin datos»: la API oficial no da el historial de un jugador, solo el de cada clan. Se busca en su clan actual, en los clanes con los que aparece en sus batallas de guerra y en todos los historiales que ha consultado esta web; con el uso se cubren más semanas.</p>' : '') + '</section>' +

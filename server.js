@@ -284,6 +284,38 @@ const CWSim = require('./public/js/sim.js');
 const { WarIndex, lastWeekKeys } = require('./lib/war-index');
 const warIndex = new WarIndex(path.join(CONFIG.dataDir, 'war-index.json'));
 setInterval(() => warIndex.save(), 10 * 60e3).unref();
+const { reliability } = require('./lib/reliability');
+
+// Ronda diaria: historial de los 300 primeros clanes de guerra del país del clan de casa. Cada historial trae a los
+// 5 clanes de cada carrera, así que el índice cubre ~1.500 clanes y se ven las semanas de un jugador aunque cambie de clan.
+const CRAWL_CLANS = 300;
+let crawling = false;
+async function crawlRankings() {
+  if (crawling || !CONFIG.clanTag) return;
+  crawling = true;
+  const t0 = Date.now();
+  let done = 0;
+  try {
+    const clan = await cr(`/clans/%23${CONFIG.clanTag}`);
+    const loc = clan.location && clan.location.isCountry ? clan.location.id : 'global';
+    const rk = await cr(`/locations/${loc}/rankings/clanwars?limit=${CRAWL_CLANS}`);
+    for (const c of rk.items || []) {
+      await getRiverlog(normalizeTag(c.tag)).then(() => { done += 1; }).catch(() => {});
+      await new Promise((r) => setTimeout(r, 1500)); // espaciadas, para no cargar la API
+    }
+    warIndex.meta.crawledAt = Date.now();
+    warIndex.dirty = true;
+    warIndex.save();
+    console.log(`Índice de guerra: ${done} clanes revisados en ${Math.round((Date.now() - t0) / 60e3)} min · ${Object.keys(warIndex.players).length} jugadores.`);
+  } catch (e) {
+    console.error('Ronda del índice de guerra:', e.message);
+  } finally {
+    crawling = false;
+  }
+}
+// La primera, 3 minutos después de arrancar si la última fue hace más de 20 h; luego, cada 24 h
+setTimeout(() => { if (!warIndex.meta.crawledAt || Date.now() - warIndex.meta.crawledAt > 20 * 3600e3) crawlRankings(); }, 3 * 60e3).unref();
+setInterval(crawlRankings, 24 * 3600e3).unref();
 process.on('SIGTERM', () => { warIndex.save(); process.exit(0); });
 
 // Historial de guerra de un jugador en las 10 últimas semanas, en cualquier clan, y si sería apto para el clan de casa
@@ -308,6 +340,7 @@ function getPlayerWar(tag) {
       const hist = CWSim.prepareHistory(known.map((w) => ({ medals: 1, createdDate: `${w.date.replace(/-/g, '')}T100000.000Z`, players: [[`#${tag}`, w.decks, w.medals]] })));
       const row = CWSim.kickReport(hist, [{ tag: `#${tag}`, name: view.name }], { weeks: known.length }).rows[0];
       evaluation = { verdict: row.verdict, apt: APT[row.verdict] || row.verdict, score: row.score, deckScore: row.deckScore, medalScore: row.medalScore,
+        reliability: reliability({ score: row.score, weeks: weeks.map((w) => (w.known ? { decks: w.decks, medals: w.medals, clan: w.clan.tag } : null)) }),
         medalsPerWeek: row.medalsPerWeek, weeks: known.length,
         rules: { medalTarget: CWSim.KICK.medalTarget, threshold: CWSim.KICK.threshold, watchUpTo: CWSim.KICK.threshold + CWSim.KICK.watchMargin, minWeeks: CWSim.KICK.minWeeks, coef: CWSim.DEFAULT_DECK_COEF } };
     }
@@ -800,6 +833,11 @@ async function route(req, res) {
       const war = await getWar(tag);
       const members = (war.rosters && war.rosters[`#${tag}`]) || [];
       let analysis;
+      // Fiabilidad de cada miembro (nota, estabilidad y fidelidad en el clan)
+      const rel = {};
+      try {
+        for (const pl of buildPlayersReport(war, await getHistory(tag), parseKickOpts(null)).players) rel[pl.tag] = pl.reliability;
+      } catch { /* sin historial: sin fiabilidad */ }
       try {
         analysis = kind === 'day'
           ? Analysis.buildDay({ tag: `#${tag}`, race: war.race, daily: dailyFor(tag), members })
@@ -807,6 +845,7 @@ async function route(req, res) {
       } catch (e) {
         throw new ApiError(e.status || 500, e.message);
       }
+      for (const pl of analysis.players) pl.reliability = rel[pl.tag] || null;
       return renderPdf({ kind, analysis, clan: { name: war.race.clan.name, tag: `#${tag}` }, generatedAt: new Date().toISOString(), tz: CONFIG.reportTz }, 'pdf_analysis.py');
     });
     const names = { day: 'dia-anterior', week: 'semana', colosseum: 'coliseo' };

@@ -47,18 +47,36 @@ def deck_color(decks, full):
     return GREEN if decks >= full else (RED if decks == 0 else AMBER)
 
 
-def players_table(players, full, days=None, show_member=True):
-    head = ['#', 'Jugador', f'Mazos (de {full})'] + ([f'D{i + 1}' for i in range(days)] if days else []) + ['Medallas', 'Por mazo']
+REL_COLOR = {'Alta': GREEN, 'Media': AMBER, 'Baja': RED}
+
+
+def times_txt(times, tz):
+    # [[ms, mazos tras el cambio, aproximado]] → «≤10:02 ×2 · 21:40 ×2»
+    out, prev = [], 0
+    for ms, count, approx in times or []:
+        t = datetime.fromtimestamp(ms / 1000, tz)
+        n = count - prev
+        prev = count
+        out.append(f"{'≤' if approx else ''}{t:%H:%M}{f' ×{n}' if n > 1 else ''}")
+    return ' · '.join(out)
+
+
+def players_table(players, full, days=None, show_member=True, tz=None, hours=False):
+    head = ['#', 'Jugador', f'Mazos (de {full})'] + ([f'D{i + 1}' for i in range(days)] if days else []) + ['Medallas', 'Por mazo', 'Fiab.'] + (['Horas'] if hours else [])
     rows = [B.hdr(head, left=2)]
     for i, p in enumerate(players, 1):
         name = esc(p['name']) + ('' if p['member'] or not show_member else ' <font color="#5E6E66">(ya no está)</font>')
         row = [str(i), Paragraph(name, S['cell']), str(p['decks'])]
         if days:
             row += [str(x) for x in (p.get('days') or [0] * days)]
+        rel = p.get('reliability') or {}
         row += [fmt(p['medals'] if 'medals' in p else p['fame']) if (p.get('medals', p.get('fame')) is not None) else '—',
-                fmt(round(p['perDeck'])) if p.get('perDeck') else '—']
+                fmt(round(p['perDeck'])) if p.get('perDeck') else '—',
+                str(rel['index']) if rel.get('index') is not None else '—']
+        if hours:
+            row.append(Paragraph(times_txt(p.get('times'), tz) or '—', S['cell']))
         rows.append(row)
-    fixed = [18, 0, 52] + [22] * (days or 0) + [56, 50]
+    fixed = [18, 0, 52] + [22] * (days or 0) + [56, 50, 34] + ([120] if hours else [])
     fixed[1] = CW - sum(fixed)
     t = Table(rows, colWidths=fixed, repeatRows=1)
     st = B.base_style(len(rows), numeric_from=2, pad=2.4)
@@ -71,8 +89,18 @@ def players_table(players, full, days=None, show_member=True):
                 st.append(('TEXTCOLOR', (3 + k, r), (3 + k, r), deck_color(x, 4)))
         if not p['member']:
             st.append(('TEXTCOLOR', (1, r), (1, r), MUTED))
+        rel = p.get('reliability') or {}
+        if rel.get('label') in REL_COLOR:
+            c = 3 + (days or 0) + 2
+            st += [('TEXTCOLOR', (c, r), (c, r), REL_COLOR[rel['label']]), ('FONTNAME', (c, r), (c, r), 'BodyB')]
+    if hours:
+        st.append(('ALIGN', (len(head) - 1, 0), (len(head) - 1, -1), 'LEFT'))
     t.setStyle(TableStyle(st))
     return t
+
+
+REL_NOTE = ('Fiab.: índice de fiabilidad (0-100) con su nota de «Expulsiones» (50 %), la estabilidad de sus medallas semana a semana (25 %) '
+            'y las semanas seguidas en el clan (25 %). Verde: alta (≥ 75); naranja: media (50-74); rojo: baja.')
 
 
 def build_day(data, a, doc, story):
@@ -106,10 +134,13 @@ def build_day(data, a, doc, story):
         tb.setStyle(TableStyle(B.base_style(len(rows), numeric_from=2, own=own)))
         story.append(tb)
     story.append(Paragraph('Jugadores', S['h2']))
-    story.append(players_table(a['players'], 4))
+    has_times = any(p.get('times') for p in a['players'])
+    story.append(players_table(a['players'], 4, tz=ZoneInfo(data.get('tz') or 'Europe/Madrid'), hours=has_times))
     story.append(Spacer(1, 4))
-    story.append(Paragraph('Mazos y medallas de cada jugador salen del registro diario de la Raspberry (una foto de la carrera cada pocos minutos). '
-                           'Medallas: lo que sumó ese día. Verde: los 4 mazos; naranja: a medias; rojo: ninguno.', S['note']))
+    story.append(Paragraph('Mazos y medallas de cada jugador salen del registro diario de la Raspberry (una foto de la carrera cada 10 minutos). '
+                           'Medallas: lo que sumó ese día. Verde: los 4 mazos; naranja: a medias; rojo: ninguno. '
+                           + ('Horas: cuándo jugó sus mazos (con un margen de 10 minutos; ×2 = dos mazos en ese rato; ≤ = antes de esa hora). ' if has_times else
+                              'Las horas de los ataques se registran desde esta versión: saldrán en los próximos días. ') + REL_NOTE, S['note']))
 
 
 def build_week(data, a, doc, story):
@@ -161,7 +192,7 @@ def build_week(data, a, doc, story):
     story.append(Spacer(1, 4))
     note = 'Mazos y medallas de la semana según el historial oficial. '
     note += ('D1–D4: mazos de cada día según el registro diario de la Raspberry. ' if a['days'] else 'El desglose por día no está disponible para esta semana (no hay registro diario). ')
-    note += 'Verde: todos los mazos; naranja: a medias; rojo: ninguno.'
+    note += 'Verde: todos los mazos; naranja: a medias; rojo: ninguno. ' + REL_NOTE
     story.append(Paragraph(note, S['note']))
 
 
@@ -186,6 +217,7 @@ def build_playerwar(data, a, doc, story):
         (fmt(round(avg_m)) if avg_m is not None else '—', 'medallas por semana'),
         (dec(avg_d, 1) if avg_d is not None else '—', 'mazos por semana (de 16)'),
         (f"{a['known']} de 10", 'semanas con datos'),
+        ((str(e['reliability']['index']) + ' · ' + e['reliability']['label']) if (e.get('reliability') or {}).get('index') is not None else '—', 'fiabilidad (0-100)'),
     ], CW))
     story.append(Spacer(1, 8))
     parts = []
@@ -229,6 +261,12 @@ def build_playerwar(data, a, doc, story):
             f"Bien (apto) por encima de {dec(r['watchUpTo'], 1)}; a revisar entre {dec(r['threshold'], 1)} y {dec(r['watchUpTo'], 1)}; "
             f"no apto por debajo de {dec(r['threshold'], 1)}. Hacen falta {r['minWeeks']} semanas con datos. "
             f"Nota de mazos: {dec(e.get('deckScore'), 2)} · nota de medallas: {dec(e.get('medalScore'), 2)}.", S['note']))
+        rl = e.get('reliability') or {}
+        if rl.get('index') is not None:
+            pct = lambda x: '—' if x is None else f"{round(x * 100)} %"
+            story.append(Paragraph(
+                f"Fiabilidad {rl['index']} ({rl['label']}): nota {pct(rl.get('nota'))} (cuenta el 50 %), estabilidad de sus medallas {pct(rl.get('estabilidad'))} (25 %) "
+                f"y {rl.get('streak', 0)} semanas seguidas en el mismo clan (25 %); {rl.get('clans', 0)} clan{'es' if rl.get('clans', 0) != 1 else ''} distinto{'s' if rl.get('clans', 0) != 1 else ''} en estas semanas.", S['note']))
 
 
 def build(data, out):

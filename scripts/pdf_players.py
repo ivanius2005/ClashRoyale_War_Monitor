@@ -131,7 +131,7 @@ def kick_note(k, opts):
     return (f"Nota = media de sus días (0 mazos {dec(c[0], 2)}, 1: {dec(c[1], 2)}, 2: {dec(c[2], 2)}, 3: {dec(c[3], 2)}, los 4: {dec(c[4], 2)}) "
             f"+ {dec(opts['medalWeight'], 1)} × (0,5 + (medallas por semana − {fmt(opts.get('medalTarget', 2400))}) × 0,001), "
             f"en las últimas {opts['weeksUsed']} semanas (hacen falta 4 con datos). Expulsar por debajo de {dec(opts['threshold'], 1)}; "
-            f"vigilar hasta {dec(opts['threshold'] + 1, 1)}; bien por encima. Son los mismos ajustes que en la pestaña «Expulsiones» de la web.")
+            f"vigilar hasta {dec(opts['threshold'] + 1, 1)}; bien por encima.")
 
 
 def build_clan(data, out):

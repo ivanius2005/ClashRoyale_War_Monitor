@@ -286,9 +286,11 @@ const warIndex = new WarIndex(path.join(CONFIG.dataDir, 'war-index.json'));
 setInterval(() => warIndex.save(), 10 * 60e3).unref();
 const { reliability } = require('./lib/reliability');
 
-// Ronda diaria: historial de los 300 primeros clanes de guerra del país del clan de casa. Cada historial trae a los
-// 5 clanes de cada carrera, así que el índice cubre ~1.500 clanes y se ven las semanas de un jugador aunque cambie de clan.
+// Ronda diaria: historial de los 300 primeros clanes de guerra del país del clan de casa y de los 500 primeros del mundo.
+// Cada historial trae a los 5 clanes de cada carrera, así que el índice cubre miles de clanes y se ven las semanas de un
+// jugador aunque cambie de clan.
 const CRAWL_CLANS = 300;
+const CRAWL_WORLD = 500;
 let crawling = false;
 async function crawlRankings() {
   if (crawling || !CONFIG.clanTag) return;
@@ -299,7 +301,10 @@ async function crawlRankings() {
     const clan = await cr(`/clans/%23${CONFIG.clanTag}`);
     const loc = clan.location && clan.location.isCountry ? clan.location.id : 'global';
     const rk = await cr(`/locations/${loc}/rankings/clanwars?limit=${CRAWL_CLANS}`);
-    for (const c of rk.items || []) {
+    const world = await cr(`/locations/global/rankings/clanwars?limit=${CRAWL_WORLD}`).catch(() => ({ items: [] }));
+    const seen = new Set();
+    const list = [...(rk.items || []), ...(world.items || [])].filter((c) => !seen.has(c.tag) && seen.add(c.tag));
+    for (const c of list) {
       await getRiverlog(normalizeTag(c.tag)).then(() => { done += 1; }).catch(() => {});
       await new Promise((r) => setTimeout(r, 1500)); // espaciadas, para no cargar la API
     }
@@ -330,7 +335,7 @@ function getPlayerWar(tag) {
     const weeks = lastWeekKeys(10).map((k) => {
       const e = entries[k];
       const meta = warIndex.weeks[k] || {};
-      return e ? { date: k, label: meta.label || null, colosseum: !!meta.colosseum, known: true, clan: { tag: e[0], name: e[1] }, decks: e[2], medals: e[3] }
+      return e ? { date: k, label: meta.label || null, colosseum: !!meta.colosseum, known: true, clan: e.clan, decks: e.decks, medals: e.medals, rank: e.rank, boat: e.boat }
         : { date: k, label: meta.label || null, colosseum: !!meta.colosseum, known: false };
     });
     const known = weeks.filter((w) => w.known);
@@ -709,7 +714,7 @@ const ACCESS_PAGE = `<!doctype html><html lang="es"><meta charset="utf-8"><meta 
 // Página de un clan: la tarjeta a pantalla completa, con buscador de clan y aviso de contenido de fans
 function clanPage(tag, home) {
   const card = fs.readFileSync(path.join(__dirname, 'deploy', 'dashboard-card.html'), 'utf8').replace(/^<!--[\s\S]*?-->\s*/, '');
-  const search = CONFIG.anyClan ? `<div class="pick"><div id="cwSearch" class="pick-s"></div>${CONFIG.clanTag && !home ? `<a href="/">← Volver a #${CONFIG.clanTag}</a>` : ''}</div><script src="/js/search.js?v=${getAssetVersion()}"></script><script>CWSearch.mount(document.getElementById('cwSearch'))</script>` : '';
+  const search = CONFIG.anyClan ? `<div class="pick"><div id="cwFind" class="pick-s"></div>${CONFIG.clanTag && !home ? `<a href="/">← Volver a #${CONFIG.clanTag}</a>` : ''}</div><script src="/js/search.js?v=${getAssetVersion()}"></script><script>CWSearch.mount(document.getElementById("cwFind"))</script>` : '';
   return `<!doctype html>
 <html lang="es"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">

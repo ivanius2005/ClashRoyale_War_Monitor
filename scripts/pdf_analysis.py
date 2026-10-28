@@ -15,11 +15,11 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import pdf_report as B  # fuentes, estilos y piezas comunes
 import pdf_players as P  # cabecera y pie de página
 from reportlab.lib import colors
-from reportlab.platypus import NextPageTemplate, Paragraph, Spacer, Table, TableStyle
+from reportlab.platypus import Flowable, NextPageTemplate, Paragraph, Spacer, Table, TableStyle
 
 S, fmt, esc, dec = B.S, B.fmt, B.esc, B.dec
 CW = P.CW
-GREEN, AMBER, RED, MUTED, INK = B.GREEN, B.AMBER, B.RED, B.MUTED, B.INK
+GREEN, AMBER, RED, MUTED, INK, GOLD = B.GREEN, B.AMBER, B.RED, B.MUTED, B.INK, B.GOLD
 
 
 def when_of(iso, tz):
@@ -197,6 +197,54 @@ def build_week(data, a, doc, story):
 
 
 APT_COLOR = {'bien': GREEN, 'vigilar': AMBER, 'expulsar': RED, 'nuevo': MUTED}
+BLUE = colors.HexColor('#2F80ED')
+
+
+class WarChart(Flowable):
+    """Medallas por semana (barras), media de 3 semanas (línea), objetivo y media del clan (discontinuas)."""
+
+    def __init__(self, weeks, target, clan_avg, width, height=150):
+        super().__init__()
+        self.weeks = list(reversed(weeks))  # de la más antigua a la más reciente
+        self.target, self.clan_avg = target, clan_avg
+        self.width, self.height = width, height
+
+    def draw(self):
+        c = self.canv
+        L, Bm, T = 30, 22, 6
+        iw, ih = self.width - L - 4, self.height - Bm - T
+        top = max([3600, self.target or 0, self.clan_avg or 0] + [w['medals'] for w in self.weeks if w['known']])
+        top = -(-top // 600) * 600
+        y = lambda v: Bm + v / top * ih
+        c.setFont('Body', 6.5)
+        for g in range(0, int(top) + 1, 600):
+            c.setStrokeColor(colors.HexColor('#E3E9E5')); c.setLineWidth(0.5); c.line(L, y(g), L + iw, y(g))
+            c.setFillColor(MUTED); c.drawRightString(L - 4, y(g) - 2, fmt(g))
+        bw = iw / len(self.weeks)
+        for i, w in enumerate(self.weeks):
+            x = L + i * bw + bw * 0.18
+            c.setFillColor(MUTED); c.drawCentredString(L + i * bw + bw / 2, 8, (w.get('label') or w['date'][5:]).replace('T', '').replace('·S', '-'))
+            if not w['known']:
+                c.setFillColor(colors.HexColor('#D5DDD8')); c.rect(x, Bm, bw * 0.64, 2, stroke=0, fill=1)
+                continue
+            col = GREEN if w['decks'] >= 16 else (RED if w['decks'] == 0 else AMBER)
+            c.setFillColor(col); c.setFillAlpha(0.6); c.rect(x, Bm, bw * 0.64, max(1, y(w['medals']) - Bm), stroke=0, fill=1); c.setFillAlpha(1)
+        def hline(v, color, dash):
+            if v:
+                c.setStrokeColor(color); c.setLineWidth(1); c.setDash(*dash); c.line(L, y(v), L + iw, y(v)); c.setDash()
+        hline(self.target, GOLD, (4, 3))
+        hline(self.clan_avg, BLUE, (1.5, 2))
+        pts = []
+        for i, w in enumerate(self.weeks):
+            win = [x for x in self.weeks[max(0, i - 2):i + 1] if x['known']]
+            if w['known'] and win:
+                pts.append((L + i * bw + bw / 2, y(sum(x['medals'] for x in win) / len(win))))
+        if len(pts) > 1:
+            c.setStrokeColor(INK); c.setLineWidth(1.6)
+            p = c.beginPath(); p.moveTo(*pts[0])
+            for pt in pts[1:]:
+                p.lineTo(*pt)
+            c.drawPath(p, stroke=1, fill=0)
 
 
 def build_playerwar(data, a, doc, story):
@@ -232,20 +280,27 @@ def build_playerwar(data, a, doc, story):
         parts.append('Con menos de 4 semanas de datos no se puede evaluar.')
     if parts:
         story.append(Paragraph(' '.join(parts), S['call']))
-    story.append(Paragraph('Últimas 10 semanas de guerra', S['h2']))
-    rows = [B.hdr(['Semana', 'Clan', 'Mazos (de 16)', 'Medallas', 'Por mazo'], left=2)]
+    story.append(Paragraph('Historial de guerra · últimas 10 semanas', S['h2']))
+    story.append(WarChart(a['weeks'], (e.get('rules') or {}).get('medalTarget', 2400), home.get('avgMedals'), CW))
+    story.append(Paragraph(f"Barras: medallas de cada semana (verde: 16 mazos; naranja: a medias; rojo: ninguno). Línea: media de 3 semanas. "
+                           f"Discontinuas: objetivo de {esc(hn)} ({fmt((e.get('rules') or {}).get('medalTarget', 2400))}, dorada)"
+                           + (f" y media del jugador de {esc(hn)} ({fmt(round(home['avgMedals']))}, azul)." if home.get('avgMedals') else '.'), S['note']))
+    story.append(Spacer(1, 6))
+    rows = [B.hdr(['Semana', 'Fecha', 'Puesto', 'Clan', 'Mazos (de 16)', 'Medallas', 'Barco'], left=4)]
     for w in a['weeks']:
-        lab = (w.get('label') or w['date']) + (' · coliseo' if w.get('colosseum') else '')
+        lab = (w.get('label') or '—') + (' · coliseo' if w.get('colosseum') else '')
+        date = f"{w['date'][8:10]}/{w['date'][5:7]}"
         if w['known']:
-            rows.append([lab, Paragraph(esc(w['clan']['name']), S['cell']), str(w['decks']), fmt(w['medals']), fmt(round(w['medals'] / w['decks'])) if w['decks'] else '—'])
+            rows.append([lab, date, f"{w['rank']}º" if w.get('rank') else '—', Paragraph(esc(w['clan']['name']), S['cell']), str(w['decks']), fmt(w['medals']), str(w.get('boat') or 0)])
         else:
-            rows.append([lab, Paragraph('<font color="#5E6E66">sin datos</font>', S['cell']), '—', '—', '—'])
-    t = Table(rows, colWidths=[120, CW - 120 - 80 - 70 - 60, 80, 70, 60])
-    st = B.base_style(len(rows), numeric_from=2)
+            rows.append([lab, date, '—', Paragraph('<font color="#5E6E66">sin datos</font>', S['cell']), '—', '—', '—'])
+    t = Table(rows, colWidths=[96, 40, 40, CW - 96 - 40 - 40 - 72 - 60 - 40, 72, 60, 40])
+    st = B.base_style(len(rows), numeric_from=4)
+    st.append(('ALIGN', (2, 0), (2, -1), 'RIGHT'))
     for i, w in enumerate(a['weeks'], 1):
         if w['known']:
-            st.append(('TEXTCOLOR', (2, i), (2, i), GREEN if w['decks'] >= 16 else (RED if w['decks'] == 0 else AMBER)))
-            st.append(('FONTNAME', (2, i), (2, i), 'BodyB'))
+            st.append(('TEXTCOLOR', (4, i), (4, i), GREEN if w['decks'] >= 16 else (RED if w['decks'] == 0 else AMBER)))
+            st.append(('FONTNAME', (4, i), (4, i), 'BodyB'))
         else:
             st.append(('TEXTCOLOR', (0, i), (-1, i), MUTED))
     t.setStyle(TableStyle(st))

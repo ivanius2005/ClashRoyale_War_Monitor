@@ -18,12 +18,12 @@
     '.cws-mode span{display:block;padding:6px 14px;border-radius:999px;font:600 13px ui-monospace,"JetBrains Mono",Menlo,Consolas,monospace;color:#9bb0a0}' +
     '.cws-mode input:checked+span{background:#00ff41;color:#021004}' +
     '.cws-mode input:focus-visible+span{outline:2px solid #00ff41;outline-offset:2px}' +
-    '.cws-box{flex:1;min-width:220px;display:flex;align-items:center;gap:8px;background:#101a14;border:1px solid #1f2e24;border-radius:999px;padding:4px 4px 4px 14px}' +
+    '.cws-box{flex:1;min-width:200px;display:flex;align-items:center;gap:8px;background:#101a14;border:1px solid #1f2e24;border-radius:999px;padding:3px 3px 3px 16px}' +
     '.cws-box:focus-within{border-color:#00ff41}' +
-    '.cws-ic{width:18px;height:18px;flex:none;fill:none;stroke:#9bb0a0;stroke-width:2;stroke-linecap:round}' +
+    '.cws-ic{width:20px;height:20px;display:block;fill:none;stroke:currentColor;stroke-width:2.4;stroke-linecap:round}' +
     '.cws-in{flex:1;min-width:0;background:none;border:0;outline:0;color:#f5fbf6;font:16px ui-monospace,"JetBrains Mono",Menlo,Consolas,monospace;padding:6px 0}' +
     '.cws-in::-webkit-search-cancel-button{filter:invert(1) opacity(.5)}' +
-    '.cws-go{flex:none;font:700 14px ui-monospace,"JetBrains Mono",Menlo,Consolas,monospace;background:#00ff41;color:#021004;border:0;border-radius:999px;padding:8px 18px;cursor:pointer}' +
+    '.cws-go{flex:none;display:grid;place-items:center;width:40px;height:40px;background:#00ff41;color:#021004;border:0;border-radius:999px;padding:0;cursor:pointer}' +
     '.cws-go:disabled{opacity:.6;cursor:progress}' +
     '.cws-go:focus-visible{outline:2px solid #00ff41;outline-offset:2px}' +
     '.cws-msg{margin:0;color:#9bb0a0;font-size:12.5px;min-height:1em}' +
@@ -49,9 +49,8 @@
             '<label><input type="radio" name="cwsk" value="p"' + (mode === 'p' ? ' checked' : '') + '><span>Jugador</span></label>' +
           '</div>' +
           '<div class="cws-box">' +
-            '<svg class="cws-ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 5 5"/></svg>' +
             '<input class="cws-in" type="search" enterkeyhint="search" autocomplete="off" autocapitalize="characters" spellcheck="false">' +
-            '<button class="cws-go" type="submit">Buscar</button>' +
+            '<button class="cws-go" type="submit" aria-label="Buscar" title="Buscar"><svg class="cws-ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 5 5"/></svg></button>' +
           '</div>' +
         '</div>' +
         '<p class="cws-msg" aria-live="polite"></p>' +

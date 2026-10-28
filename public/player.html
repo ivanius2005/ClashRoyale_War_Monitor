@@ -86,6 +86,10 @@ h2{margin:0 0 12px;font-size:15px;color:var(--w)}
 .wt .db{display:inline-block;vertical-align:middle;width:64px;height:7px;border-radius:999px;background:var(--p3);margin-left:6px;overflow:hidden}
 .wt .db i{display:block;height:100%;border-radius:999px}
 .wscroll{overflow-x:auto}
+.wchart{width:100%;height:auto;display:block;margin:6px 0 2px}
+.wchart text{font:10px ui-monospace,"JetBrains Mono",Menlo,Consolas,monospace;fill:var(--d)}
+.wleg{display:flex;flex-wrap:wrap;gap:4px 14px;color:var(--m);font-size:11.5px;margin-top:4px}
+.wleg i{display:inline-block;width:14px;height:3px;border-radius:2px;vertical-align:middle;margin-right:5px}
 .chip{font-size:10px;color:var(--gold);border:1px solid currentColor;border-radius:999px;padding:0 6px;margin-left:6px}
 @media (max-width:820px){.grid2{grid-template-columns:1fr}.deck{grid-template-columns:repeat(4,minmax(0,1fr))}.hero{grid-template-columns:1fr}.lv{display:none}}
 @media (prefers-reduced-motion:no-preference){.card,.tile{animation:in .35s ease both}@keyframes in{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}}
@@ -93,7 +97,7 @@ h2{margin:0 0 12px;font-size:15px;color:var(--w)}
 </head>
 <body>
 <div class="wrap">
-  <div class="pick"><div id="cwSearch" style="flex:1;min-width:0"></div><a href="/">← Panel inicial</a></div>
+  <div class="pick"><div id="cwFind" style="flex:1;min-width:0"></div><a href="/">← Panel inicial</a></div>
   <main id="out" aria-live="polite"><div class="card msg">Cargando jugador…</div></main>
   <p class="fan">Contenido de fans, no afiliado ni respaldado por Supercell. Datos de la API oficial de Clash Royale.</p>
 </div>
@@ -109,7 +113,7 @@ h2{margin:0 0 12px;font-size:15px;color:var(--w)}
   var norm = function (v) { return String(v || '').toUpperCase().replace(/[^0-9A-Z]/g, '').replace(/O/g, '0'); };
   var TAG_RE = /^[0289PYLQGRJCUV]{3,12}$/;
 
-  CWSearch.mount($('cwSearch'), { mode: 'p' });
+  CWSearch.mount($('cwFind'), { mode: 'p' });
 
   var tag = norm(decodeURIComponent(location.pathname.split('/')[2] || ''));
   if (!TAG_RE.test(tag)) { $('out').innerHTML = '<div class="card msg err">Tag de jugador no válido.</div>'; return; }
@@ -247,14 +251,43 @@ h2{margin:0 0 12px;font-size:15px;color:var(--w)}
       cmp = '<p class="muted" style="margin:10px 0 0">El jugador medio de ' + esc(home.name) + ' hace ' + fmt(Math.round(home.avgMedals)) + ' medallas y ' + dec(home.avgDecks, 1) +
         ' mazos por semana; este jugador, <b style="color:var(--w)">' + fmt(Math.round(avgM)) + ' y ' + dec(avgD, 1) + '</b> (' + (diff >= 0 ? '+' : '−') + Math.round(Math.abs(diff) * 100) + ' % de medallas).</p>';
     }
+    var dd = function (iso) { var x = iso.split('-'); return x[2] + '/' + x[1]; };
     var rows = d.weeks.map(function (w) {
-      var lab = esc(w.label || w.date) + (w.colosseum ? '<span class="chip">coliseo</span>' : '');
-      if (!w.known) return '<tr class="unk"><td>' + lab + '</td><td>sin datos</td><td class="n">—</td><td class="n">—</td><td class="n">—</td></tr>';
+      var lab = esc(w.label || '—') + (w.colosseum ? '<span class="chip">coliseo</span>' : '');
+      if (!w.known) return '<tr class="unk"><td>' + lab + '</td><td>' + dd(w.date) + '</td><td class="n">—</td><td>sin datos</td><td class="n">—</td><td class="n">—</td><td class="n">—</td></tr>';
       var col = w.decks >= 16 ? 'var(--g)' : w.decks === 0 ? 'var(--r)' : 'var(--gold)';
-      return '<tr><td>' + lab + '</td><td><a href="/c/' + esc(norm(w.clan.tag)) + '">' + esc(w.clan.name) + '</a></td>' +
+      return '<tr><td>' + lab + '</td><td>' + dd(w.date) + '</td><td class="n">' + (w.rank ? w.rank + 'º' : '—') + '</td><td><a href="/c/' + esc(norm(w.clan.tag)) + '">' + esc(w.clan.name) + '</a></td>' +
         '<td class="n"><b style="color:' + col + '">' + w.decks + '</b>/16<span class="db"><i style="width:' + Math.round(w.decks / 16 * 100) + '%;background:' + col + '"></i></span></td>' +
-        '<td class="n">' + fmt(w.medals) + '</td><td class="n">' + (w.decks ? fmt(Math.round(w.medals / w.decks)) : '—') + '</td></tr>';
+        '<td class="n">' + fmt(w.medals) + '</td><td class="n">' + (w.boat || 0) + '</td></tr>';
     }).join('');
+    // Gráfica: medallas por semana (barras), media de 3 semanas (línea), objetivo del clan y media del clan
+    var ws = d.weeks.slice().reverse();
+    var target = e.rules ? e.rules.medalTarget : 2400;
+    var top = Math.max(3600, target, home.avgMedals || 0, Math.max.apply(null, ws.map(function (w) { return w.known ? w.medals : 0; })));
+    top = Math.ceil(top / 600) * 600;
+    var W = 640, H = 210, L = 38, R = 8, T = 10, B = 26, iw = W - L - R, ih = H - T - B, bw = iw / ws.length;
+    var y = function (v) { return T + ih - (v / top) * ih; };
+    var grid = '';
+    for (var g = 0; g <= top; g += 600) grid += '<line x1="' + L + '" x2="' + (W - R) + '" y1="' + y(g) + '" y2="' + y(g) + '" stroke="var(--l)"/><text x="' + (L - 6) + '" y="' + (y(g) + 3) + '" text-anchor="end">' + fmt(g) + '</text>';
+    var bars = ws.map(function (w, i) {
+      var x = L + i * bw + bw * 0.18, bwi = bw * 0.64;
+      var lab = '<text x="' + (L + i * bw + bw / 2) + '" y="' + (H - 8) + '" text-anchor="middle">' + esc((w.label || dd(w.date)).replace('T', '').replace('·S', '-')) + '</text>';
+      if (!w.known) return '<rect x="' + x + '" y="' + (T + ih - 4) + '" width="' + bwi + '" height="4" rx="1" fill="var(--l)"><title>' + esc(w.label || w.date) + ': sin datos</title></rect>' + lab;
+      var col = w.decks >= 16 ? 'var(--g)' : w.decks === 0 ? 'var(--r)' : 'var(--gold)';
+      return '<rect x="' + x + '" y="' + y(w.medals) + '" width="' + bwi + '" height="' + Math.max(1, T + ih - y(w.medals)) + '" rx="2" fill="' + col + '" fill-opacity=".55"><title>' +
+        esc((w.label || w.date) + ' · ' + w.clan.name + ': ' + fmt(w.medals) + ' medallas, ' + w.decks + '/16 mazos') + '</title></rect>' + lab;
+    }).join('');
+    var pts = [];
+    ws.forEach(function (w, i) {
+      var win = ws.slice(Math.max(0, i - 2), i + 1).filter(function (x) { return x.known; });
+      if (w.known && win.length) pts.push((L + i * bw + bw / 2).toFixed(1) + ',' + y(win.reduce(function (s, x) { return s + x.medals; }, 0) / win.length).toFixed(1));
+    });
+    var hline = function (v, color, dash) { return v ? '<line x1="' + L + '" x2="' + (W - R) + '" y1="' + y(v) + '" y2="' + y(v) + '" stroke="' + color + '" stroke-dasharray="' + dash + '" stroke-width="1.2"/>' : ''; };
+    var chart = '<svg class="wchart" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Medallas por semana">' + grid + bars +
+      hline(target, 'var(--gold)', '5 4') + hline(home.avgMedals, 'var(--b)', '2 3') +
+      (pts.length > 1 ? '<polyline points="' + pts.join(' ') + '" fill="none" stroke="var(--w)" stroke-width="2" stroke-linejoin="round"/>' : '') + '</svg>' +
+      '<div class="wleg"><span><i style="background:var(--w)"></i>media de 3 semanas</span><span><i style="background:var(--gold)"></i>objetivo de ' + esc(home.name || 'el clan') + ' (' + fmt(target) + ')</span>' +
+      (home.avgMedals ? '<span><i style="background:var(--b)"></i>media del jugador de ' + esc(home.name) + ' (' + fmt(Math.round(home.avgMedals)) + ')</span>' : '') + '</div>';
     var r = e.rules;
     $('pWar').innerHTML =
       '<section class="card"><div class="wtop"><div><div class="k">Evaluación para ' + esc(home.name || 'el clan') + '</div>' +
@@ -263,7 +296,7 @@ h2{margin:0 0 12px;font-size:15px;color:var(--w)}
         (e.reliability && e.reliability.index != null ? 'Fiabilidad <b class="' + ({ Alta: 'good', Media: 'warn', Baja: 'bad' }[e.reliability.label] || '') + '">' + e.reliability.index + ' · ' + esc(e.reliability.label) + '</b> · ' : '') +
         d.known + ' de 10 semanas con datos</div></div>' +
         '<a class="pdfbtn" href="/api/player-war.pdf?tag=%23' + tag + '" target="_blank" rel="noopener">⤓ Historial en PDF</a></div>' + cmp + '</section>' +
-      '<section class="card"><h2>Últimas 10 semanas de guerra</h2><div class="wscroll"><table class="wt"><thead><tr><th>Semana</th><th>Clan</th><th style="text-align:right">Mazos</th><th style="text-align:right">Medallas</th><th style="text-align:right">Por mazo</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
+      '<section class="card"><h2>Historial de guerra · últimas 10 semanas</h2>' + chart + '<div class="wscroll" style="margin-top:12px"><table class="wt"><thead><tr><th>Semana</th><th>Fecha</th><th style="text-align:right">Puesto</th><th>Clan</th><th style="text-align:right">Mazos</th><th style="text-align:right">Medallas</th><th style="text-align:right">Barco</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
         (d.known < 10 ? '<p class="muted" style="margin:10px 0 0">«Sin datos»: la API oficial no da el historial de un jugador, solo el de cada clan. Se busca en su clan actual, en los clanes con los que aparece en sus batallas de guerra y en todos los historiales que ha consultado esta web; con el uso se cubren más semanas.</p>' : '') + '</section>' +
       (r ? '<p class="muted" style="text-align:center;margin:0">Requisitos de ' + esc(home.name || 'el clan') + ' (por defecto): apto por encima de ' + dec(r.watchUpTo, 1) + ', a revisar entre ' + dec(r.threshold, 1) + ' y ' + dec(r.watchUpTo, 1) + ', no apto por debajo; objetivo ' + fmt(r.medalTarget) + ' medallas por semana; hacen falta ' + r.minWeeks + ' semanas.</p>' : '');
   }

@@ -9,13 +9,13 @@ test('índice de guerra: guarda a los jugadores de los 5 clanes y los recuerda e
   const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'wi-')), 'war-index.json');
   const ix = new WarIndex(file);
   ix.ingest({ items: [{ seasonId: 137, sectionIndex: 1, createdDate: '20261019T093505.000Z', standings: [
-    { trophyChange: 20, clan: { tag: '#A', name: 'Clan A', participants: [{ tag: '#P1', decksUsed: 16, fame: 3000 }] } },
-    { trophyChange: -5, clan: { tag: '#B', name: 'Clan B', participants: [{ tag: '#P2', decksUsed: 8, fame: 1200 }] } },
+    { rank: 1, trophyChange: 20, clan: { tag: '#A', name: 'Clan A', participants: [{ tag: '#P1', decksUsed: 16, fame: 3000, boatAttacks: 1 }] } },
+    { rank: 3, trophyChange: -5, clan: { tag: '#B', name: 'Clan B', participants: [{ tag: '#P2', decksUsed: 8, fame: 1200 }] } },
   ] }] });
-  assert.deepEqual(ix.get('#P2')['2026-10-19'], ['#B', 'Clan B', 8, 1200]);
+  assert.deepEqual(ix.get('#P2')['2026-10-19'], { clan: { tag: '#B', name: 'Clan B' }, decks: 8, medals: 1200, rank: 3, boat: 0 });
   assert.equal(ix.weeks['2026-10-19'].label, 'T137·S2');
   ix.save();
-  assert.deepEqual(new WarIndex(file).get('#P1')['2026-10-19'], ['#A', 'Clan A', 16, 3000]);
+  assert.deepEqual(new WarIndex(file).get('#P1')['2026-10-19'], { clan: { tag: '#A', name: 'Clan A' }, decks: 16, medals: 3000, rank: 1, boat: 1 });
 });
 
 test('índice de guerra: las 10 últimas semanas cerradas acaban en lunes', () => {

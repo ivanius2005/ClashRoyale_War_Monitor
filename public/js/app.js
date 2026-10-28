@@ -1374,13 +1374,23 @@ function rankBlock(x, label, where) {
     else if (win.median === x.current) head = `Si ganáis esta semana seguiréis en el ${x.current}º ${where}`;
     else head = `Aunque ganéis, bajaréis del ${x.current}º al ${win.median}º ${where} (otros clanes subirán más)`;
   }
+  // Y si quedáis últimos (5º)
+  const lose = x.outcomes && x.outcomes[4];
+  if (lose) {
+    let t;
+    if (lose.pIn < 0.5) t = x.current ? `Si quedáis últimos saldríais del top ${fmt(x.top)} ${where}` : `Si quedáis últimos seguiréis fuera del top ${fmt(x.top)} ${where}`;
+    else if (!x.current) t = `Si quedáis últimos entraríais igualmente, en el ${lose.median}º ${where}`;
+    else if (lose.median > x.current) t = `Si quedáis últimos bajaréis del ${x.current}º al ${lose.median}º ${where}`;
+    else t = `Aunque quedéis últimos, seguiréis en el ${lose.median}º ${where}`;
+    head += `</p><p class="rnk-head lose">${esc(t)}`;
+  }
   const rows = (x.outcomes || []).map((o) => `<tr><td>${o.rank}º</td><td class="${o.delta > 0 ? 'up' : 'down'}">${o.delta > 0 ? '+' : ''}${o.delta}</td>` +
     `<td><b>${pos(o)}</b></td><td class="dim">${o.pIn < 0.5 || o.p10 === o.p90 ? '' : `${o.p10}º–${o.p90}º`}</td></tr>`).join('');
   const exp = x.expected ? `<p class="rnk-sub">Con las probabilidades de esta semana, lo más probable: <b>${x.expected.pIn < 0.5 ? 'N/A' : `${x.expected.median}º`}</b></p>` : '';
   return `<div class="rnk"><h3>${esc(label)} <span class="dim">· top ${fmt(x.top)}</span></h3>` +
     `<p class="rnk-now">${x.current ? `${x.current}º` : 'N/A'}</p>` +
     `<p class="rnk-sub">${x.current ? `${fmt(x.trophies)} trofeos de guerra` : `fuera del top ${fmt(x.top)}${x.cutoff ? ` (el último tiene ${fmt(x.cutoff)}; vosotros ${fmt(x.trophies)})` : ''}`}</p>` +
-    (head ? `<p class="rnk-head">${esc(head)}</p>` : '') +
+    (head ? `<p class="rnk-head">${head.split('</p><p class="rnk-head lose">').map(esc).join('</p><p class="rnk-head lose">')}</p>` : '') +
     (rows ? `<table class="rnk-t"><thead><tr><th>Si acabáis</th><th>Trofeos</th><th>Puesto</th><th>Margen</th></tr></thead><tbody>${rows}</tbody></table>` : '') + exp + nearbyTable(x) + '</div>';
 }
 

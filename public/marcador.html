@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#050805"><title>Botón de RoyaleAPI · Guerra de clanes</title>
+<style>
+:root{--bg:#050805;--p:#0a110d;--p2:#101a14;--l:#1f2e24;--t:#dde9e0;--w:#f5fbf6;--m:#9bb0a0;--d:#6e8474;--g:#00ff41;color-scheme:dark}
+*{box-sizing:border-box}
+html{background:var(--bg)}
+body{margin:0;padding:max(16px,env(safe-area-inset-top)) 14px max(28px,env(safe-area-inset-bottom));font:14.5px/1.6 ui-monospace,"JetBrains Mono",SFMono-Regular,Menlo,Consolas,monospace;color:var(--t)}
+.wrap{max-width:760px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+a{color:var(--g)}
+.back{color:var(--m);font-size:12.5px;align-self:flex-end}
+.card{background:var(--p);border:1px solid var(--l);border-radius:16px;padding:20px 22px}
+h1{margin:0 0 6px;font-size:24px;color:var(--w)}
+h2{margin:0 0 10px;font-size:15px;color:var(--w)}
+p{margin:0 0 10px}
+.muted{color:var(--m);font-size:13px}
+.bm{display:inline-flex;align-items:center;gap:8px;font-weight:700;font-size:15px;color:#021004;background:var(--g);border-radius:999px;padding:10px 20px;text-decoration:none;cursor:grab;margin:6px 0 10px}
+ol{margin:0;padding-left:1.3em}
+li{margin:0 0 8px}
+kbd{font:inherit;font-size:12.5px;background:var(--p2);border:1px solid var(--l);border-radius:6px;padding:1px 6px}
+.fan{color:var(--d);font-size:11.5px;text-align:center;margin:8px 0 0}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a class="back" href="/">← Panel inicial</a>
+  <section class="card">
+    <h1>Botón «→ Monitor de guerra»</h1>
+    <p class="muted">Trae el historial de guerra completo de un jugador desde RoyaleAPI (todas sus semanas, en todos sus clanes) a su ficha del monitor: gráfica, veredicto apto o no apto, fiabilidad y PDF.</p>
+    <a class="bm" id="bm" href="#" title="Arrástrame a la barra de marcadores">→ Monitor de guerra</a>
+    <p class="muted">No lo pulses aquí: arrástralo a tu barra de marcadores.</p>
+  </section>
+  <section class="card">
+    <h2>Instalarlo (una vez)</h2>
+    <ol>
+      <li>Muestra la barra de marcadores del navegador: <kbd>Ctrl</kbd> + <kbd>Mayús</kbd> + <kbd>B</kbd> (en Mac, <kbd>⌘</kbd> + <kbd>Mayús</kbd> + <kbd>B</kbd>).</li>
+      <li>Arrastra el botón verde de arriba hasta la barra.</li>
+      <li>Listo: aparecerá como «→ Monitor de guerra».</li>
+    </ol>
+  </section>
+  <section class="card">
+    <h2>Usarlo</h2>
+    <ol>
+      <li>Abre la página del jugador en RoyaleAPI: <span class="muted">royaleapi.com/player/TAG</span>.</li>
+      <li>Pulsa «→ Monitor de guerra» en la barra de marcadores. Si el historial no está cargado, el botón pulsa «Load Clan Wars 2 History» y espera.</li>
+      <li>Se abre su ficha en el monitor, en la pestaña «Guerra · 10 semanas», con las semanas de RoyaleAPI marcadas.</li>
+    </ol>
+    <p class="muted" style="margin-top:10px">El botón solo lee la tabla que ya ves en la pantalla de tu navegador y la manda a esta web. Si una semana aparece a la vez en la API oficial y en RoyaleAPI (por ejemplo, porque cambió de clan a mitad de semana), cuenta el clan donde más jugó.</p>
+  </section>
+  <p class="fan">Contenido de fans, no afiliado ni respaldado por Supercell ni por RoyaleAPI.</p>
+</div>
+<script>
+(function () {
+  'use strict';
+  // Código del marcador (se ejecuta en royaleapi.com, en la página de un jugador)
+  var code = function () {
+    var ORIGIN = '__ORIGIN__';
+    var m = location.pathname.match(/\/player\/([0-9a-z]+)/i);
+    if (!/royaleapi\.com$/.test(location.hostname) || !m) { alert('Abre la página de un jugador en royaleapi.com (royaleapi.com/player/…) y vuelve a pulsar el botón.'); return; }
+    function isTable(t) { var x = t.innerText || ''; return /\d{4}-\d{2}-\d{2}/.test(x) && /(^|\s)\d{2,3}-\d(\s|$)/m.test(x) && !!t.querySelector('a[href*="/clan/"]'); }
+    function find() { var ts = document.querySelectorAll('table'); for (var i = 0; i < ts.length; i++) if (isTable(ts[i])) return ts[i]; return null; }
+    function send(t) {
+      var rows = [];
+      var trs = t.querySelectorAll('tr');
+      for (var r = 0; r < trs.length; r++) {
+        var tr = trs[r];
+        var cells = [].slice.call(tr.children);
+        var tx = cells.map(function (c) { return (c.innerText || '').trim(); });
+        var si = -1, di = -1;
+        for (var k = 0; k < tx.length; k++) { if (si < 0 && /^\d{2,3}-\d$/.test(tx[k])) si = k; if (di < 0 && /^\d{4}-\d{2}-\d{2}$/.test(tx[k])) di = k; }
+        var a = tr.querySelector('a[href*="/clan/"]');
+        if (si < 0 || di < 0 || !a) continue;
+        var ci = -1;
+        for (k = 0; k < cells.length; k++) if (cells[k].contains(a)) { ci = k; break; }
+        var rank = null;
+        for (k = di + 1; k < ci; k++) if (/^[1-5]$/.test(tx[k])) { rank = +tx[k]; break; }
+        var nums = tx.slice(ci + 1).map(function (x) { return x.replace(/[^\d]/g, ''); }).filter(function (x) { return x !== ''; }).map(Number);
+        var clan = ((a.getAttribute('href').split('/clan/')[1]) || '').split(/[/?#]/)[0];
+        // Columnas tras el clan: mazos, medallas, reparación, ataques al barco, total
+        rows.push({ sw: tx[si], date: tx[di], rank: rank, clan: clan, clanName: (a.innerText || '').trim(), decks: nums[0], fame: nums[1], boat: nums.length >= 5 ? nums[3] : 0 });
+      }
+      if (!rows.length) { alert('La tabla del historial está vacía.'); return; }
+      var data = { tag: m[1].toUpperCase(), rows: rows.slice(0, 20) };
+      var url = ORIGIN + '/p/' + data.tag + '#importar=' + encodeURIComponent(btoa(unescape(encodeURIComponent(JSON.stringify(data)))));
+      var w = null;
+      try { w = window.open(url, '_blank'); } catch (e) { w = null; }
+      if (!w) location.href = url; // ventana bloqueada: en la misma pestaña
+    }
+    var t = find();
+    if (t) { send(t); return; }
+    // Sin historial cargado: pulsar «Load Clan Wars 2 History» y esperar a la tabla (hasta 30 s)
+    var bs = document.querySelectorAll('button, a, .button, [role=button]');
+    var b = null;
+    for (var i = 0; i < bs.length; i++) if (/clan wars 2 history/i.test(bs[i].textContent || '')) { b = bs[i]; break; }
+    if (b) b.click();
+    var tries = 0;
+    var timer = setInterval(function () {
+      var t2 = find();
+      if (t2 || ++tries > 60) {
+        clearInterval(timer);
+        if (t2) send(t2);
+        else alert('No encuentro el historial de guerra. Pulsa «Load Clan Wars 2 History» en la página y vuelve a pulsar el botón.');
+      }
+    }, 500);
+  };
+  var src = '(' + code.toString().replace('__ORIGIN__', location.origin) + ')()';
+  var a = document.getElementById('bm');
+  a.href = 'javascript:' + encodeURIComponent(src);
+  a.addEventListener('click', function (e) { e.preventDefault(); alert('Arrástrame a la barra de marcadores; luego púlsame en la página de un jugador de RoyaleAPI.'); });
+})();
+</script>
+</body></html>

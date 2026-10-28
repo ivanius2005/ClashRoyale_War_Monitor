@@ -332,10 +332,16 @@ function getPlayerWar(tag) {
     const clans = [...new Set([view.clan && view.clan.tag, ...((view.battles && view.battles.warClans) || []).map((c) => c.tag)].filter(Boolean))].slice(0, 4);
     await Promise.all(clans.map((c) => getRiverlog(normalizeTag(c)).catch(() => null)));
     const entries = warIndex.get(`#${tag}`);
+    const imported = warIndex.getImported(`#${tag}`); // de RoyaleAPI (marcador): solo donde no hay dato oficial
     const weeks = lastWeekKeys(10).map((k) => {
-      const e = entries[k];
       const meta = warIndex.weeks[k] || {};
-      return e ? { date: k, label: meta.label || null, colosseum: !!meta.colosseum, known: true, clan: e.clan, decks: e.decks, medals: e.medals, rank: e.rank, boat: e.boat }
+      // Oficial y RoyaleAPI: vale el clan donde más jugó esa semana (si cambió de clan sale en los dos); a igualdad, el oficial
+      const o = entries[k];
+      const r = imported[k];
+      const useImp = r && (!o || r.decks > o.decks || (r.decks === o.decks && r.medals > o.medals));
+      const e = useImp ? r : o;
+      const source = useImp ? 'royaleapi' : o ? 'api' : null;
+      return e ? { date: k, label: meta.label || e.label || null, colosseum: !!meta.colosseum, known: true, source, clan: e.clan, decks: e.decks, medals: e.medals, rank: e.rank, boat: e.boat }
         : { date: k, label: meta.label || null, colosseum: !!meta.colosseum, known: false };
     });
     const known = weeks.filter((w) => w.known);
@@ -744,7 +750,8 @@ async function route(req, res) {
     res.writeHead(204, { ...corsHeaders(req), 'Access-Control-Allow-Methods': 'GET', 'Access-Control-Allow-Headers': 'Accept', 'Access-Control-Max-Age': '86400' });
     return res.end();
   }
-  if (req.method !== 'GET' && req.method !== 'HEAD') return json(req, res, 405, { error: 'Método no permitido' });
+  // Solo lectura, salvo la importación del historial de RoyaleAPI (marcador)
+  if (req.method !== 'GET' && req.method !== 'HEAD' && !(req.method === 'POST' && p === '/api/player-war/import')) return json(req, res, 405, { error: 'Método no permitido' });
 
   if (p === '/api/health') return json(req, res, 200, { ok: true });
   if (CONFIG.requireAccess && !accessEmail(req)) {
@@ -755,6 +762,10 @@ async function route(req, res) {
   if (p === '/monitor') return serveStatic(res, '/index.html');
   if (p === '/monitor/') return send(res, 301, 'text/plain; charset=utf-8', '', { Location: '/monitor' });
   if (p === '/' || p === '/clan' || p === '/clan/') return send(res, 200, 'text/html; charset=utf-8', clanPage(CONFIG.clanTag, true), { 'Cache-Control': 'no-store' });
+  // Página para instalar el marcador que trae el historial de guerra de RoyaleAPI
+  if (p === '/marcador' || p === '/marcador/') {
+    return send(res, 200, 'text/html; charset=utf-8', fs.readFileSync(path.join(__dirname, 'public', 'marcador.html')), { 'Cache-Control': 'no-store' });
+  }
   const mp = p.match(/^\/p\/([^/]+)\/?$/); // ficha de un jugador: /p/J9LGQQGGJ
   if (mp) {
     const t = normalizeTag(decodeURIComponent(mp[1]));
@@ -814,6 +825,31 @@ async function route(req, res) {
     return sendPdf(res, pdf, `${slug(sum)}-${stamp(sum.at)}.pdf`);
   }
   // Desempeño de los jugadores (10 semanas): informe del clan o ficha de uno
+  // Importar el historial de guerra de un jugador leído de RoyaleAPI por el marcador (en el navegador de quien lo usa)
+  if (p === '/api/player-war/import') {
+    if (req.method !== 'POST') return json(req, res, 405, { error: 'Usa POST.' });
+    let body = '';
+    for await (const chunk of req) { body += chunk; if (body.length > 64e3) return json(req, res, 413, { error: 'Demasiados datos.' }); }
+    let data;
+    try { data = JSON.parse(body); } catch { return json(req, res, 400, { error: 'Datos no válidos.' }); }
+    const tag = normalizeTag(String(data.tag || ''));
+    if (!TAG_RE.test(tag)) return json(req, res, 400, { error: 'Tag de jugador no válido.' });
+    const int = (v, max) => { const n = Math.round(Number(v)); return Number.isFinite(n) && n >= 0 && n <= max ? n : null; };
+    const rows = (Array.isArray(data.rows) ? data.rows : []).slice(0, 40).map((r) => {
+      const sw = /^(\d{2,3})-(\d)$/.exec(String(r.sw || ''));
+      const date = /^\d{4}-\d{2}-\d{2}$/.test(String(r.date || '')) ? r.date : null;
+      const ct = normalizeTag(String(r.clan || ''));
+      const decks = int(r.decks, 16); const medals = int(r.fame, 6000);
+      if (!sw || !date || !TAG_RE.test(ct) || decks == null || medals == null) return null;
+      return { date, label: `T${sw[1]}·S${sw[2]}`, clan: { tag: `#${ct}`, name: String(r.clanName || `#${ct}`).slice(0, 40) }, decks, medals, rank: int(r.rank, 5) || null, boat: int(r.boat, 16) || 0 };
+    }).filter(Boolean);
+    if (!rows.length) return json(req, res, 400, { error: 'No llegó ninguna semana válida.' });
+    guardClan(tag, `player:${tag}`);
+    warIndex.importRows(`#${tag}`, rows);
+    caches.delete(`pwar:${tag}`); caches.delete(`pwarpdf:${tag}`);
+    return json(req, res, 200, { ok: true, tag: `#${tag}`, weeks: rows.length });
+  }
+
   // Historial de guerra de un jugador (cualquiera) en PDF, con su evaluación para el clan de casa
   if (p === '/api/player-war.pdf') {
     if (!CONFIG.pdfEnabled) return json(req, res, 404, { error: 'La exportación a PDF está desactivada (PDF_ENABLED=0).' });

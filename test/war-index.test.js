@@ -31,3 +31,14 @@ test('coliseo: la semana que acaba el primer lunes de un mes (4.ª o 5.ª de la 
   assert.equal(R.isColosseumWeek(Date.parse('2026-11-23T12:00:00Z')), false);
   assert.equal(R.isColosseumWeek(Date.parse('2026-12-01T12:00:00Z')), true);   // acaba el 7 de diciembre (5.ª semana)
 });
+
+test('índice de guerra: si cambió de clan a mitad de semana, vale el clan donde más jugó', () => {
+  const ix = new WarIndex(null);
+  const wk = (clan, decks, fame) => ({ items: [{ seasonId: 137, sectionIndex: 2, createdDate: '20261026T093505.000Z',
+    standings: [{ rank: 1, trophyChange: 20, clan: { tag: clan, name: clan, participants: [{ tag: '#J', decksUsed: decks, fame }] } }] }] });
+  ix.ingest(wk('#JUGO', 12, 2200));
+  ix.ingest(wk('#DEJO', 0, 0));          // el clan que dejó llega después, con 0 mazos: no lo pisa
+  assert.equal(ix.get('#J')['2026-10-26'].clan.tag, '#JUGO');
+  ix.ingest(wk('#JUGO', 16, 2900));      // el mismo clan con datos nuevos sí se actualiza
+  assert.equal(ix.get('#J')['2026-10-26'].decks, 16);
+});

@@ -203,6 +203,19 @@ h2{margin:0 0 12px;font-size:15px;color:var(--w)}
       '<p class="muted" style="text-align:center;margin:0">Datos de ' + ago(v.fetchedAt) + '. La API guarda sus ' + b.available + ' últimas batallas; la guerra es la de su clan actual.</p>';
   }
 
+  // ---------- Historial traído de RoyaleAPI con el marcador (#importar=…) ----------
+  var importing = null;
+  if (location.hash.indexOf('#importar=') === 0) {
+    var payload = null;
+    try { payload = JSON.parse(decodeURIComponent(escape(atob(decodeURIComponent(location.hash.slice(10)))))); } catch (e) { payload = null; }
+    history.replaceState(null, '', location.pathname + '#guerra');
+    importing = payload
+      ? fetch('/api/player-war/import', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+        .then(function (r) { return r.json().then(function (d) { if (!r.ok) throw new Error(d.error || ('Error ' + r.status)); return d; }); })
+        .catch(function (e) { return { error: e.message }; })
+      : Promise.resolve({ error: 'Los datos del botón no se pudieron leer.' });
+  }
+
   // ---------- Pestañas: Resumen / Guerra · 10 semanas ----------
   var warLoaded = false;
   function setupTabs() {
@@ -231,9 +244,22 @@ h2{margin:0 0 12px;font-size:15px;color:var(--w)}
   }
 
   function loadWar() {
-    fetch('/api/player-war/' + tag).then(function (r) {
+    var imp = null;
+    (importing || Promise.resolve(null)).then(function (x) {
+      imp = x;
+      return fetch('/api/player-war/' + tag);
+    }).then(function (r) {
       return r.json().then(function (d) { if (!r.ok) throw new Error(d.error || ('Error ' + r.status)); return d; });
-    }).then(renderWar).catch(function (e) {
+    }).then(function (d) {
+      renderWar(d);
+      if (imp) {
+        var n = document.createElement('div');
+        n.className = 'card'; n.style.cssText = 'padding:12px 16px;border-color:' + (imp.error ? 'var(--r)' : 'var(--g)');
+        n.innerHTML = imp.error ? '<span class="bad">No se pudo importar de RoyaleAPI: ' + esc(imp.error) + '</span>'
+          : '<span class="good">✓ Importadas ' + imp.weeks + ' semanas de RoyaleAPI.</span> <span class="muted">Si una semana sale en dos clanes, cuenta el clan donde más jugó.</span>';
+        $('pWar').insertBefore(n, $('pWar').firstChild);
+      }
+    }).catch(function (e) {
       $('pWar').innerHTML = '<div class="card msg err">' + esc(e.message) + '</div>';
     });
   }
@@ -253,7 +279,7 @@ h2{margin:0 0 12px;font-size:15px;color:var(--w)}
     }
     var dd = function (iso) { var x = iso.split('-'); return x[2] + '/' + x[1]; };
     var rows = d.weeks.map(function (w) {
-      var lab = esc(w.label || '—') + (w.colosseum ? '<span class="chip">coliseo</span>' : '');
+      var lab = esc(w.label || '—') + (w.colosseum ? '<span class="chip">coliseo</span>' : '') + (w.source === 'royaleapi' ? '<span class="chip" style="color:var(--b)">RoyaleAPI</span>' : '');
       if (!w.known) return '<tr class="unk"><td>' + lab + '</td><td>' + dd(w.date) + '</td><td class="n">—</td><td>sin datos</td><td class="n">—</td><td class="n">—</td><td class="n">—</td></tr>';
       var col = w.decks >= 16 ? 'var(--g)' : w.decks === 0 ? 'var(--r)' : 'var(--gold)';
       return '<tr><td>' + lab + '</td><td>' + dd(w.date) + '</td><td class="n">' + (w.rank ? w.rank + 'º' : '—') + '</td><td><a href="/c/' + esc(norm(w.clan.tag)) + '">' + esc(w.clan.name) + '</a></td>' +
@@ -297,7 +323,7 @@ h2{margin:0 0 12px;font-size:15px;color:var(--w)}
         d.known + ' de 10 semanas con datos</div></div>' +
         '<a class="pdfbtn" href="/api/player-war.pdf?tag=%23' + tag + '" target="_blank" rel="noopener">⤓ Historial en PDF</a></div>' + cmp + '</section>' +
       '<section class="card"><h2>Historial de guerra · últimas 10 semanas</h2>' + chart + '<div class="wscroll" style="margin-top:12px"><table class="wt"><thead><tr><th>Semana</th><th>Fecha</th><th style="text-align:right">Puesto</th><th>Clan</th><th style="text-align:right">Mazos</th><th style="text-align:right">Medallas</th><th style="text-align:right">Barco</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
-        (d.known < 10 ? '<p class="muted" style="margin:10px 0 0">«Sin datos»: la API oficial no da el historial de un jugador, solo el de cada clan. Se busca en su clan actual, en los clanes con los que aparece en sus batallas de guerra y en todos los historiales que ha consultado esta web; con el uso se cubren más semanas.</p>' : '') + '</section>' +
+        (d.known < 10 ? '<p class="muted" style="margin:10px 0 0">«Sin datos»: la API oficial no da el historial de un jugador, solo el de cada clan. Se busca en su clan actual, en los clanes con los que aparece en sus batallas de guerra y en miles de clanes que la web revisa cada día. Para completarlo, usa el <a href="/marcador">botón de RoyaleAPI</a> en su página de RoyaleAPI.</p>' : '') + '</section>' +
       (r ? '<p class="muted" style="text-align:center;margin:0">Requisitos de ' + esc(home.name || 'el clan') + ' (por defecto): apto por encima de ' + dec(r.watchUpTo, 1) + ', a revisar entre ' + dec(r.threshold, 1) + ' y ' + dec(r.watchUpTo, 1) + ', no apto por debajo; objetivo ' + fmt(r.medalTarget) + ' medallas por semana; hacen falta ' + r.minWeeks + ' semanas.</p>' : '');
   }
 

@@ -10,10 +10,6 @@ body{margin:0;padding:max(16px,env(safe-area-inset-top)) 14px max(28px,env(safe-
 .wrap{max-width:1100px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
 a{color:var(--g)}
 .pick{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
-.pick label{color:var(--m);font-size:12.5px}
-.pick input{font:inherit;font-size:16px;flex:1;min-width:9em;max-width:16em;background:var(--p2);color:var(--w);border:1px solid var(--l);border-radius:999px;padding:7px 14px}
-.pick button{font:inherit;font-weight:700;background:var(--g);color:#021004;border:0;border-radius:999px;padding:8px 16px;cursor:pointer}
-.pick button.alt{background:none;color:var(--g);border:1px solid var(--g)}
 .pick a{color:var(--m);font-size:12.5px;margin-left:auto}
 .pdfbtn{display:inline-block;margin-top:10px;font-weight:700;font-size:13px;color:#021004;background:var(--g);border-radius:999px;padding:7px 14px;text-decoration:none}
 .pdfbtn:hover{filter:brightness(1.1)}
@@ -97,7 +93,7 @@ h2{margin:0 0 12px;font-size:15px;color:var(--w)}
 </head>
 <body>
 <div class="wrap">
-  <div class="pick"><div id="cwFind" style="flex:1;min-width:0"></div><a href="/">← Panel inicial</a></div>
+  <div class="pick" style="flex-direction:column;align-items:stretch"><a href="/" style="align-self:flex-end">← Panel inicial</a><div id="cwFind"></div></div>
   <main id="out" aria-live="polite"><div class="card msg">Cargando jugador…</div></main>
   <p class="fan">Contenido de fans, no afiliado ni respaldado por Supercell. Datos de la API oficial de Clash Royale.</p>
 </div>
@@ -113,7 +109,7 @@ h2{margin:0 0 12px;font-size:15px;color:var(--w)}
   var norm = function (v) { return String(v || '').toUpperCase().replace(/[^0-9A-Z]/g, '').replace(/O/g, '0'); };
   var TAG_RE = /^[0289PYLQGRJCUV]{3,12}$/;
 
-  CWSearch.mount($('cwFind'), { mode: 'p' });
+  CWSearch.mount($('cwFind'));
 
   var tag = norm(decodeURIComponent(location.pathname.split('/')[2] || ''));
   if (!TAG_RE.test(tag)) { $('out').innerHTML = '<div class="card msg err">Tag de jugador no válido.</div>'; return; }

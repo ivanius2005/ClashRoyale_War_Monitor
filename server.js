@@ -727,14 +727,11 @@ function clanPage(tag, home) {
 <meta name="theme-color" content="#050805"><title>Guerra de clanes${tag && !home ? ` · #${tag}` : ''}</title>
 <style>html{background:#050805;color-scheme:dark}body{margin:0;padding:max(16px,env(safe-area-inset-top)) 12px max(24px,env(safe-area-inset-bottom));display:flex;flex-direction:column;align-items:center;gap:14px;font:14px ui-monospace,"JetBrains Mono",Menlo,Consolas,monospace;color:#dde9e0}
 .pick{display:flex;flex-wrap:wrap;align-items:center;gap:8px;width:100%;max-width:1100px}
-.pick label{color:#9bb0a0;font-size:12.5px}
-.pick input{font:inherit;font-size:16px;flex:1;min-width:9em;max-width:16em;background:#101a14;color:#f5fbf6;border:1px solid #1f2e24;border-radius:999px;padding:7px 14px}
-.pick button{font:inherit;font-weight:700;background:#00ff41;color:#021004;border:0;border-radius:999px;padding:8px 16px;cursor:pointer}
-.pick button.alt{background:none;color:#00ff41;border:1px solid #00ff41}
 .pick a{color:#9bb0a0;font-size:12.5px;margin-left:auto}
-.pick-s{flex:1;min-width:0}
-.fan{max-width:1100px;color:#6e8474;font-size:11.5px;text-align:center;margin:0}
-.pick input:focus-visible,.pick button:focus-visible{outline:2px solid #00ff41;outline-offset:2px}</style>
+.pick-s{flex:1 1 100%;min-width:0}
+.pick{justify-content:center}
+.pick a{order:-1;margin-left:auto}
+.fan{max-width:1100px;color:#6e8474;font-size:11.5px;text-align:center;margin:0}</style>
 </head><body>${search}<script>window.CW_CARD_TAG=${JSON.stringify(tag || '')};window.CW_CARD_HOME=${home ? 'true' : 'false'};</script>${card}
 <p class="fan">Contenido de fans, no afiliado ni respaldado por Supercell. Datos de la API oficial de Clash Royale.</p></body></html>`;
 }
@@ -935,6 +932,20 @@ async function route(req, res) {
   if (m) {
     const tag = tagFrom(req, res, m[1]);
     return tag && json(req, res, 200, await getRanking(tag));
+  }
+  // ¿Ese tag es de un clan o de un jugador? (los tags son únicos): para el buscador de una sola caja
+  m = p.match(/^\/api\/lookup\/([^/]+)\/?$/);
+  if (m) {
+    const tag = normalizeTag(decodeURIComponent(m[1]));
+    if (!TAG_RE.test(tag)) return json(req, res, 400, { error: 'Ese tag no es válido: solo lleva los caracteres 0 2 8 9 P Y L Q G R J C U V.' });
+    guardClan(tag, `lookup:${tag}`);
+    const found = await cached(`lookup:${tag}`, CONFIG.historyCacheMs, async () => {
+      try { const c = await cr(`/clans/%23${tag}`); return { type: 'clan', tag: `#${tag}`, name: c.name }; } catch (e) { if (e.status !== 404) throw e; }
+      try { const pl = await cr(`/players/%23${tag}`); return { type: 'player', tag: `#${tag}`, name: pl.name }; } catch (e) { if (e.status !== 404) throw e; }
+      notFound.set(`lookup:${tag}`, Date.now());
+      throw new ApiError(404, 'No hay ningún clan ni jugador con ese tag.');
+    });
+    return json(req, res, 200, found);
   }
   m = p.match(/^\/api\/player-war\/([^/]+)\/?$/);
   if (m) {

@@ -86,6 +86,12 @@ h2{margin:0 0 12px;font-size:15px;color:var(--w)}
 .wchart text{font:10px ui-monospace,"JetBrains Mono",Menlo,Consolas,monospace;fill:var(--d)}
 .wleg{display:flex;flex-wrap:wrap;gap:4px 14px;color:var(--m);font-size:11.5px;margin-top:4px}
 .wleg i{display:inline-block;width:14px;height:3px;border-radius:2px;vertical-align:middle;margin-right:5px}
+.ra{display:flex;flex-direction:column;gap:10px}
+.ra-row{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center}
+.ra-btn{display:inline-block;font-weight:700;font-size:13px;color:#021004;background:var(--g);border-radius:999px;padding:8px 16px;text-decoration:none}
+.ra-paste{min-height:64px;border:1px dashed var(--l);border-radius:12px;padding:12px 14px;color:var(--m);font-size:13px;background:var(--p2);outline:0}
+.ra-paste:focus{border-color:var(--g);color:var(--t)}
+.ra-msg{font-size:12.5px;color:var(--m);margin:0}
 .chip{font-size:10px;color:var(--gold);border:1px solid currentColor;border-radius:999px;padding:0 6px;margin-left:6px}
 @media (max-width:820px){.grid2{grid-template-columns:1fr}.deck{grid-template-columns:repeat(4,minmax(0,1fr))}.hero{grid-template-columns:1fr}.lv{display:none}}
 @media (prefers-reduced-motion:no-preference){.card,.tile{animation:in .35s ease both}@keyframes in{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}}
@@ -248,6 +254,11 @@ h2{margin:0 0 12px;font-size:15px;color:var(--w)}
       return r.json().then(function (d) { if (!r.ok) throw new Error(d.error || ('Error ' + r.status)); return d; });
     }).then(function (d) {
       renderWar(d);
+      var pa = $('raPaste');
+      if (pa) {
+        pa.addEventListener('paste', onPaste);
+        pa.addEventListener('focus', function () { if (!pa.dataset.used) { pa.dataset.used = '1'; pa.textContent = ''; } });
+      }
       if (imp) {
         var n = document.createElement('div');
         n.className = 'card'; n.style.cssText = 'padding:12px 16px;border-color:' + (imp.error ? 'var(--r)' : 'var(--g)');
@@ -278,7 +289,7 @@ h2{margin:0 0 12px;font-size:15px;color:var(--w)}
       var lab = esc(w.label || '—') + (w.colosseum ? '<span class="chip">coliseo</span>' : '') + (w.source === 'royaleapi' ? '<span class="chip" style="color:var(--b)">RoyaleAPI</span>' : '');
       if (!w.known) return '<tr class="unk"><td>' + lab + '</td><td>' + dd(w.date) + '</td><td class="n">—</td><td>sin datos</td><td class="n">—</td><td class="n">—</td><td class="n">—</td></tr>';
       var col = w.decks >= 16 ? 'var(--g)' : w.decks === 0 ? 'var(--r)' : 'var(--gold)';
-      return '<tr><td>' + lab + '</td><td>' + dd(w.date) + '</td><td class="n">' + (w.rank ? w.rank + 'º' : '—') + '</td><td><a href="/c/' + esc(norm(w.clan.tag)) + '">' + esc(w.clan.name) + '</a></td>' +
+      return '<tr><td>' + lab + '</td><td>' + dd(w.date) + '</td><td class="n">' + (w.rank ? w.rank + 'º' : '—') + '</td><td>' + (w.clan.tag ? '<a href="/c/' + esc(norm(w.clan.tag)) + '">' + esc(w.clan.name) + '</a>' : esc(w.clan.name)) + '</td>' +
         '<td class="n"><b style="color:' + col + '">' + w.decks + '</b>/16<span class="db"><i style="width:' + Math.round(w.decks / 16 * 100) + '%;background:' + col + '"></i></span></td>' +
         '<td class="n">' + fmt(w.medals) + '</td><td class="n">' + (w.boat || 0) + '</td></tr>';
     }).join('');
@@ -320,7 +331,59 @@ h2{margin:0 0 12px;font-size:15px;color:var(--w)}
         '<a class="pdfbtn" href="/api/player-war.pdf?tag=%23' + tag + '" target="_blank" rel="noopener">⤓ Historial en PDF</a></div>' + cmp + '</section>' +
       '<section class="card"><h2>Historial de guerra · últimas 10 semanas</h2>' + chart + '<div class="wscroll" style="margin-top:12px"><table class="wt"><thead><tr><th>Semana</th><th>Fecha</th><th style="text-align:right">Puesto</th><th>Clan</th><th style="text-align:right">Mazos</th><th style="text-align:right">Medallas</th><th style="text-align:right">Barco</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
         (d.known < 10 ? '<p class="muted" style="margin:10px 0 0">«Sin datos»: la API oficial no da el historial de un jugador, solo el de cada clan. Se busca en su clan actual, en los clanes con los que aparece en sus batallas de guerra y en miles de clanes que la web revisa cada día. Para completarlo, usa el <a href="/marcador">botón de RoyaleAPI</a> en su página de RoyaleAPI.</p>' : '') + '</section>' +
+      '<section class="card ra"><h2 style="margin:0">Completar con RoyaleAPI</h2>' +
+        '<p class="muted" style="margin:0">Para semanas en clanes que el monitor no conoce (pequeños o de otros países).</p>' +
+        '<div class="ra-row"><a class="ra-btn" href="https://royaleapi.com/player/' + tag + '" target="_blank" rel="noopener">Abrir en RoyaleAPI ↗</a>' +
+        '<a href="/marcador">Usar el botón «→ Monitor de guerra» (también en el móvil)</a></div>' +
+        '<div class="ra-paste" id="raPaste" contenteditable="true" role="textbox" aria-label="Pega aquí la página de RoyaleAPI">En el ordenador: en RoyaleAPI pulsa «Load Clan Wars 2 History», luego Ctrl + A y Ctrl + C, y pega aquí (Ctrl + V).</div>' +
+        '<p class="ra-msg" id="raMsg" aria-live="polite"></p></section>' +
       (r ? '<p class="muted" style="text-align:center;margin:0">Requisitos de ' + esc(home.name || 'el clan') + ' (por defecto): apto por encima de ' + dec(r.watchUpTo, 1) + ', a revisar entre ' + dec(r.threshold, 1) + ' y ' + dec(r.watchUpTo, 1) + ', no apto por debajo; objetivo ' + fmt(r.medalTarget) + ' medallas por semana; hacen falta ' + r.minWeeks + ' semanas.</p>' : '');
+  }
+
+  // ---------- Pegar la página de RoyaleAPI: se lee la tabla del historial (con los enlaces a los clanes si vienen) ----------
+  function parseRoyaleApi(html, text) {
+    var rows = [];
+    var push = function (cells, links) {
+      var si = -1, di = -1, k;
+      for (k = 0; k < cells.length; k++) { if (si < 0 && /^\d{2,3}-\d$/.test(cells[k])) si = k; if (di < 0 && /^\d{4}-\d{2}-\d{2}$/.test(cells[k])) di = k; }
+      if (si < 0 || di < 0) return;
+      var ci = -1;
+      for (k = di + 1; k < cells.length; k++) if (cells[k] && !/^[\d.,\s]*$/.test(cells[k])) { ci = k; break; }
+      if (ci < 0) return;
+      var rank = null;
+      for (k = di + 1; k < ci; k++) if (/^[1-5]$/.test(cells[k])) { rank = +cells[k]; break; }
+      var nums = cells.slice(ci + 1).map(function (x) { return x.replace(/[^\d]/g, ''); }).filter(function (x) { return x !== ''; }).map(Number);
+      if (nums.length < 2) return;
+      rows.push({ sw: cells[si], date: cells[di], rank: rank, clan: (links && links[ci]) || '', clanName: cells[ci], decks: nums[0], fame: nums[1], boat: nums.length >= 5 ? nums[3] : 0 });
+    };
+    if (html) {
+      var doc = new DOMParser().parseFromString(html, 'text/html');
+      [].forEach.call(doc.querySelectorAll('tr'), function (tr) {
+        var tds = [].slice.call(tr.children);
+        var links = tds.map(function (c) { var a = c.querySelector('a[href*="/clan/"]'); return a ? ((a.getAttribute('href').split('/clan/')[1]) || '').split(/[/?#]/)[0] : ''; });
+        push(tds.map(function (c) { return (c.textContent || '').replace(/\s+/g, ' ').trim(); }), links);
+      });
+    }
+    if (!rows.length && text) {
+      text.split(/\r?\n/).forEach(function (line) { push(line.split('\t').map(function (x) { return x.trim(); }), null); });
+    }
+    return rows;
+  }
+
+  function onPaste(e) {
+    e.preventDefault();
+    var cd = e.clipboardData || window.clipboardData;
+    var html = cd.getData('text/html'), text = cd.getData('text/plain') || '';
+    var rows = parseRoyaleApi(html, text);
+    var msgEl = $('raMsg');
+    if (!rows.length) { msgEl.innerHTML = '<span class="bad">No encuentro el historial de guerra en lo pegado. ¿Pulsaste «Load Clan Wars 2 History» antes de copiar?</span>'; return; }
+    var all = (html || '') + ' ' + text;
+    if (all.indexOf(tag) < 0 && !confirm('En lo pegado no aparece el tag #' + tag + '. ¿Seguro que es la página de este jugador?')) return;
+    msgEl.textContent = 'Importando ' + rows.length + ' semanas…';
+    fetch('/api/player-war/import', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tag: tag, rows: rows.slice(0, 20) }) })
+      .then(function (r) { return r.json().then(function (d) { if (!r.ok) throw new Error(d.error || ('Error ' + r.status)); return d; }); })
+      .then(function (d) { importing = Promise.resolve(d); loadWar(); })
+      .catch(function (err) { msgEl.innerHTML = '<span class="bad">' + esc(err.message) + '</span>'; });
   }
 
   fetch('/api/player/' + tag).then(function (r) {

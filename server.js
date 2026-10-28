@@ -351,7 +351,7 @@ function getPlayerWar(tag) {
       const hist = CWSim.prepareHistory(known.map((w) => ({ medals: 1, createdDate: `${w.date.replace(/-/g, '')}T100000.000Z`, players: [[`#${tag}`, w.decks, w.medals]] })));
       const row = CWSim.kickReport(hist, [{ tag: `#${tag}`, name: view.name }], { weeks: known.length }).rows[0];
       evaluation = { verdict: row.verdict, apt: APT[row.verdict] || row.verdict, score: row.score, deckScore: row.deckScore, medalScore: row.medalScore,
-        reliability: reliability({ score: row.score, weeks: weeks.map((w) => (w.known ? { decks: w.decks, medals: w.medals, clan: w.clan.tag } : null)) }),
+        reliability: reliability({ score: row.score, weeks: weeks.map((w) => (w.known ? { decks: w.decks, medals: w.medals, clan: w.clan.tag || w.clan.name } : null)) }),
         medalsPerWeek: row.medalsPerWeek, weeks: known.length,
         rules: { medalTarget: CWSim.KICK.medalTarget, threshold: CWSim.KICK.threshold, watchUpTo: CWSim.KICK.threshold + CWSim.KICK.watchMargin, minWeeks: CWSim.KICK.minWeeks, coef: CWSim.DEFAULT_DECK_COEF } };
     }
@@ -835,10 +835,13 @@ async function route(req, res) {
     const rows = (Array.isArray(data.rows) ? data.rows : []).slice(0, 40).map((r) => {
       const sw = /^(\d{2,3})-(\d)$/.exec(String(r.sw || ''));
       const date = /^\d{4}-\d{2}-\d{2}$/.test(String(r.date || '')) ? r.date : null;
+      // El tag del clan es opcional (si se pegó solo texto, sin enlaces, solo llega su nombre)
       const ct = normalizeTag(String(r.clan || ''));
+      const hasTag = TAG_RE.test(ct);
+      const cname = String(r.clanName || '').trim().slice(0, 40);
       const decks = int(r.decks, 16); const medals = int(r.fame, 6000);
-      if (!sw || !date || !TAG_RE.test(ct) || decks == null || medals == null) return null;
-      return { date, label: `T${sw[1]}·S${sw[2]}`, clan: { tag: `#${ct}`, name: String(r.clanName || `#${ct}`).slice(0, 40) }, decks, medals, rank: int(r.rank, 5) || null, boat: int(r.boat, 16) || 0 };
+      if (!sw || !date || (!hasTag && !cname) || decks == null || medals == null) return null;
+      return { date, label: `T${sw[1]}·S${sw[2]}`, clan: { tag: hasTag ? `#${ct}` : null, name: cname || `#${ct}` }, decks, medals, rank: int(r.rank, 5) || null, boat: int(r.boat, 16) || 0 };
     }).filter(Boolean);
     if (!rows.length) return json(req, res, 400, { error: 'No llegó ninguna semana válida.' });
     guardClan(tag, `player:${tag}`);

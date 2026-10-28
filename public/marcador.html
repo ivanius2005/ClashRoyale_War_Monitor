@@ -20,6 +20,8 @@ ol{margin:0;padding-left:1.3em}
 li{margin:0 0 8px}
 kbd{font:inherit;font-size:12.5px;background:var(--p2);border:1px solid var(--l);border-radius:6px;padding:1px 6px}
 .fan{color:var(--d);font-size:11.5px;text-align:center;margin:8px 0 0}
+.copy{display:block;font:inherit;font-weight:700;font-size:14px;color:var(--g);background:none;border:1px solid var(--g);border-radius:999px;padding:9px 18px;cursor:pointer;margin:0 0 10px}
+.copy:focus-visible,.bm:focus-visible{outline:2px solid var(--g);outline-offset:2px}
 </style>
 </head>
 <body>
@@ -29,10 +31,31 @@ kbd{font:inherit;font-size:12.5px;background:var(--p2);border:1px solid var(--l)
     <h1>Botón «→ Monitor de guerra»</h1>
     <p class="muted">Trae el historial de guerra completo de un jugador desde RoyaleAPI (todas sus semanas, en todos sus clanes) a su ficha del monitor: gráfica, veredicto apto o no apto, fiabilidad y PDF.</p>
     <a class="bm" id="bm" href="#" title="Arrástrame a la barra de marcadores">→ Monitor de guerra</a>
-    <p class="muted">No lo pulses aquí: arrástralo a tu barra de marcadores.</p>
+    <button type="button" class="copy" id="copy">Copiar el código (para el móvil)</button>
+    <p class="muted" id="copyMsg" aria-live="polite">En el ordenador, arrástralo a tu barra de marcadores. En el móvil, copia el código.</p>
+  </section>
+  <section class="card" id="android">
+    <h2>En Android (Chrome) · una vez</h2>
+    <ol>
+      <li>Pulsa «Copiar el código».</li>
+      <li>Guarda esta misma página como marcador: menú <kbd>⋮</kbd> → estrella ☆.</li>
+      <li>Toca «Editar» en el aviso (o ve a Marcadores, mantén pulsado el nuevo y elige «Editar»).</li>
+      <li>Nombre: <b>Monitor de guerra</b>. URL: borra lo que hay y pega el código.</li>
+    </ol>
+    <p class="muted"><b>Usarlo:</b> en la página del jugador en RoyaleAPI, toca la barra de direcciones, escribe <b>Monitor</b> y toca «Monitor de guerra» en las sugerencias.</p>
+  </section>
+  <section class="card" id="ios">
+    <h2>En iPhone (Safari) · una vez</h2>
+    <ol>
+      <li>Pulsa «Copiar el código».</li>
+      <li>Añade esta página a Favoritos: botón compartir <kbd>⬆︎</kbd> → «Añadir a favoritos».</li>
+      <li>Abre Marcadores <kbd>📖</kbd> → Favoritos → «Editar», toca el nuevo marcador.</li>
+      <li>Nombre: <b>Monitor de guerra</b>. Dirección: borra lo que hay y pega el código.</li>
+    </ol>
+    <p class="muted"><b>Usarlo:</b> en la página del jugador en RoyaleAPI, toca Marcadores <kbd>📖</kbd> → «Monitor de guerra».</p>
   </section>
   <section class="card">
-    <h2>Instalarlo (una vez)</h2>
+    <h2>En el ordenador · una vez</h2>
     <ol>
       <li>Muestra la barra de marcadores del navegador: <kbd>Ctrl</kbd> + <kbd>Mayús</kbd> + <kbd>B</kbd> (en Mac, <kbd>⌘</kbd> + <kbd>Mayús</kbd> + <kbd>B</kbd>).</li>
       <li>Arrastra el botón verde de arriba hasta la barra.</li>
@@ -108,6 +131,23 @@ kbd{font:inherit;font-size:12.5px;background:var(--p2);border:1px solid var(--l)
   var a = document.getElementById('bm');
   a.href = 'javascript:' + encodeURIComponent(src);
   a.addEventListener('click', function (e) { e.preventDefault(); alert('Arrástrame a la barra de marcadores; luego púlsame en la página de un jugador de RoyaleAPI.'); });
+  // Copiar el código (móvil: se pega como dirección de un marcador)
+  var msg = document.getElementById('copyMsg');
+  document.getElementById('copy').addEventListener('click', function () {
+    var code = a.href;
+    var done = function () { msg.textContent = '✓ Código copiado. Ahora pégalo como dirección (URL) de un marcador, como se explica abajo.'; msg.style.color = 'var(--g)'; };
+    function fallback() {
+      var t = document.createElement('textarea'); t.value = code; t.setAttribute('readonly', ''); t.style.position = 'fixed'; t.style.opacity = '0';
+      document.body.appendChild(t); t.select(); t.setSelectionRange(0, code.length);
+      try { document.execCommand('copy'); done(); } catch (e) { msg.textContent = 'No se pudo copiar: mantén pulsado el botón verde y elige «Copiar enlace».'; }
+      document.body.removeChild(t);
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(code).then(done, fallback); else fallback();
+  });
+  // En el móvil, primero los pasos de su sistema
+  var ua = navigator.userAgent;
+  var first = /iPhone|iPad|iPod/.test(ua) ? 'ios' : /Android/.test(ua) ? 'android' : null;
+  if (first) { var sec = document.getElementById(first); sec.parentNode.insertBefore(sec, sec.parentNode.children[2]); }
 })();
 </script>
 </body></html>

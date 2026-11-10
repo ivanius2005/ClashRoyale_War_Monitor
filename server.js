@@ -942,11 +942,22 @@ async function route(req, res) {
     const tag = normalizeTag(decodeURIComponent(m[1]));
     if (!TAG_RE.test(tag)) return json(req, res, 400, { error: 'Ese tag no es válido: solo lleva los caracteres 0 2 8 9 P Y L Q G R J C U V.' });
     guardClan(tag, `lookup:${tag}`);
+    // Un mismo tag puede ser a la vez de un clan y de un jugador: se preguntan los dos
     const found = await cached(`lookup:${tag}`, CONFIG.historyCacheMs, async () => {
-      try { const c = await cr(`/clans/%23${tag}`); return { type: 'clan', tag: `#${tag}`, name: c.name }; } catch (e) { if (e.status !== 404) throw e; }
-      try { const pl = await cr(`/players/%23${tag}`); return { type: 'player', tag: `#${tag}`, name: pl.name }; } catch (e) { if (e.status !== 404) throw e; }
-      notFound.set(`lookup:${tag}`, Date.now());
-      throw new ApiError(404, 'No hay ningún clan ni jugador con ese tag.');
+      const miss = (e) => { if (e && e.status === 404) return null; throw e; };
+      const [c, pl] = await Promise.all([cr(`/clans/%23${tag}`).catch(miss), cr(`/players/%23${tag}`).catch(miss)]);
+      const matches = [];
+      if (c) matches.push({ type: 'clan', tag: `#${tag}`, name: c.name, members: c.members, warTrophies: c.clanWarTrophies,
+        empty: (c.members || 0) <= 1 && !c.clanWarTrophies });
+      if (pl) matches.push({ type: 'player', tag: `#${tag}`, name: pl.name, level: pl.expLevel, clan: pl.clan ? pl.clan.name : null });
+      if (!matches.length) {
+        notFound.set(`lookup:${tag}`, Date.now());
+        throw new ApiError(404, 'No hay ningún clan ni jugador con ese tag.');
+      }
+      // Si solo hay uno, ese; si hay los dos y el clan está vacío (1 miembro o menos, sin trofeos de guerra), el jugador
+      const real = matches.filter((x) => !x.empty);
+      const pick = matches.length === 1 ? matches[0] : real.length === 1 ? real[0] : null;
+      return { type: pick ? pick.type : null, tag: `#${tag}`, name: pick ? pick.name : null, matches };
     });
     return json(req, res, 200, found);
   }

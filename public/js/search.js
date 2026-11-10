@@ -81,8 +81,19 @@
         // Parece un tag: el servidor dice si es de un clan o de un jugador
         say('Buscando ' + '#' + t + '…');
         job = getJson('/api/lookup/' + t).then(function (d) {
-          say((d.type === 'clan' ? 'Clan ' : 'Jugador ') + d.name + '…');
-          location.href = (d.type === 'clan' ? '/c/' : '/p/') + t;
+          if (d.type) {
+            say((d.type === 'clan' ? 'Clan ' : 'Jugador ') + d.name + '…');
+            location.href = (d.type === 'clan' ? '/c/' : '/p/') + t;
+            return;
+          }
+          // El tag es a la vez de un clan y de un jugador: elegir con un toque
+          say('Ese tag es de un clan y también de un jugador. ¿Cuál buscas?');
+          res.innerHTML = d.matches.map(function (x) {
+            return x.type === 'clan'
+              ? '<li><a href="/c/' + t + '"><b>Clan: ' + esc(x.name) + '</b><span>' + fmt(x.members) + '/50 · ' + fmt(x.warTrophies) + ' trofeos de guerra</span></a></li>'
+              : '<li><a href="/p/' + t + '"><b>Jugador: ' + esc(x.name) + '</b><span>nivel ' + fmt(x.level) + (x.clan ? ' · ' + esc(x.clan) : '') + '</span></a></li>';
+          }).join('');
+          res.hidden = false;
         }).catch(function (err) {
           // No es un tag que exista: quizá era un nombre de clan (sin #)
           if (err.status === 404 && q.charAt(0) !== '#' && q.length >= 3) return byName(q);

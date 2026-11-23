@@ -29,6 +29,12 @@ Busca cualquier clan por su nombre o por su tag. La web tiene cuatro pestañas.
 - Veredicto por jugador (expulsar, vigilar, bien o sin evaluar), barra con el reparto de sus días y botón para copiar la lista.
 - Semanas y nota mínima ajustables; se recuerdan en el navegador. La misma nota decide «apto / no apto» al reclutar (ficha de jugador).
 
+**Reclutamiento** (solo el clan de casa)
+- Busca en el índice de guerra jugadores con buena nota según los criterios del clan (por defecto ≥ +1), del país del clan
+  (la mitad o más de sus semanas en clanes del ranking de guerra de ese país), sin clan y con un nivel mínimo.
+- Cada uno con su ficha, su tag y un enlace que abre su perfil en el juego (`link.clashroyale.com`) para invitarle.
+  Ruta: `GET /api/recruit?country=home|any&min=1&level=40&noclan=1`.
+
 **04 · Simulación de la semana (Monte Carlo)**
 - Probabilidad de quedar 1º, 2º… 5º y el puesto esperado de cada clan.
 - **Medallas esperadas** de cada clan, con su escenario pesimista y optimista.
@@ -422,7 +428,7 @@ Protecciones para no agotar la API de Clash Royale ni la Raspberry:
 - **Tope de clanes nuevos** (`NEW_CLANS_PER_MIN`, 10 por defecto): si se supera, se responde «prueba en un minuto». El clan de casa no cuenta.
 - **Tags inexistentes** recordados 10 minutos: no se vuelven a pedir a la API.
 - **Límite por visitante**: `RATE_LIMIT_PER_MIN` consultas por minuto y por IP.
-- **Simulaciones**: las 500.000 del simulador las hace el navegador; el resumen de otros clanes usa `SUMMARY_RUNS_OTHERS` (5.000).
+- **Simulaciones**: los 3.000.000 del simulador los hace el navegador (unos 20-60 s según el aparato); el resumen de otros clanes usa `SUMMARY_RUNS_OTHERS` (5.000).
 - **PDF**: solo del clan de casa; para los demás aparece «🔒 bloqueado».
 - **Uso**: `curl http://127.0.0.1:3055/api/stats` (solo desde la propia máquina).
 

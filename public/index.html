@@ -36,6 +36,8 @@
   <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 5 5"/></symbol>
   <symbol id="i-userx" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="m16.5 8.5 5 5M21.5 8.5l-5 5"/></symbol>
   <symbol id="i-swap" viewBox="0 0 24 24"><path d="M4 8h14l-3.5-3.5M20 16H6l3.5 3.5"/></symbol>
+  <symbol id="i-userplus" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M19 8v6M16 11h6"/></symbol>
+  <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 14a4.5 4.5 0 0 0 6.4 0l3-3a4.5 4.5 0 0 0-6.4-6.4l-1 1"/><path d="M14 10a4.5 4.5 0 0 0-6.4 0l-3 3a4.5 4.5 0 0 0 6.4 6.4l1-1"/></symbol>
 </svg>
 
 <div class="wrap">
@@ -104,6 +106,7 @@
     <button type="button" role="tab" id="tab-live" aria-controls="panel-live" aria-selected="true" data-tab="live"><svg class="ic"><use href="#i-swords"/></svg><span class="tl-long">Hoy en directo</span><span class="tl-short">Hoy</span></button>
     <button type="button" role="tab" id="tab-players" aria-controls="panel-players" aria-selected="false" data-tab="players" tabindex="-1"><svg class="ic"><use href="#i-users"/></svg>Jugadores</button>
     <button type="button" role="tab" id="tab-kick" aria-controls="panel-kick" aria-selected="false" data-tab="kick" tabindex="-1"><svg class="ic"><use href="#i-userx"/></svg><span class="tl-long">Expulsiones</span><span class="tl-short">Expulsar</span></button>
+    <button type="button" role="tab" id="tab-recruit" aria-controls="panel-recruit" aria-selected="false" data-tab="recruit" tabindex="-1"><svg class="ic"><use href="#i-userplus"/></svg><span class="tl-long">Reclutamiento</span><span class="tl-short">Reclutar</span></button>
     <button type="button" role="tab" id="tab-sim" aria-controls="panel-sim" aria-selected="false" data-tab="sim" tabindex="-1"><svg class="ic"><use href="#i-dice"/></svg><span class="tl-long">Simulador de la semana</span><span class="tl-short">Simular</span></button>
     <button type="button" role="tab" id="tab-top" aria-controls="panel-top" aria-selected="false" data-tab="top" tabindex="-1"><svg class="ic"><use href="#i-trophy"/></svg>Top</button>
   </nav>
@@ -192,7 +195,6 @@
       <div class="fhead"><span class="fno">MES</span><h2 id="monthTitle">Miembro del mes</h2></div>
       <div class="mgrid" id="monthTop"></div>
       <div class="tablewrap"><table class="mtable" id="monthTable"></table></div>
-      <p class="note" id="monthNote"></p>
     </section>
     <section class="fig" aria-labelledby="plTitle">
       <div class="fhead"><span class="fno">FIG. 06</span><h2 id="plTitle">Compromiso de los jugadores</h2>
@@ -204,11 +206,6 @@
       </div>
       <div class="tiles t4" id="plKpis"></div>
       <div class="tablewrap"><table class="dtable" id="plTable"></table></div>
-      <ul class="assume">
-        <li><b>Mazos jugados:</b> la parte de sus mazos de guerra que jugó en las semanas en que estaba en el clan.</li>
-        <li><b>Días con fallos:</b> días de guerra en los que se dejó algún mazo.</li>
-        <li><b>Riesgo hoy:</b> la misma cifra suavizada con la media del clan, para que dos o tres semanas de datos no den 0 % ni 100 %. Es la probabilidad que usa la web para prever los mazos que se jugarán.</li>
-      </ul>
     </section>
   </div>
 
@@ -221,20 +218,56 @@
         <div class="aside"><a class="btn pdf" id="kPdf" href="api/players.pdf" target="_blank" rel="noopener" hidden><svg class="ic"><use href="#i-download"/></svg><span>Informe PDF</span></a><button type="button" class="btn" id="kCopy"><svg class="ic"><use href="#i-copy"/></svg><span>Copiar la lista</span></button></div>
       </div>
       <p class="fsub" hidden>Una nota para cada miembro según su media de medallas por semana y los mazos que juega de 160 en las 10 últimas semanas. Cuanto más baja, más motivos para expulsarle.</p>
-      <form class="kctl" id="kForm">
-        <label for="kClan">Clan <select id="kClan"></select></label>
-        <label>Semanas a tener en cuenta
-          <span class="rangebox"><input type="range" id="kWeeks" min="1" max="10" step="1" value="10"><output id="kWeeksOut" for="kWeeks">10</output></span>
-        </label>
-        <label>Nota mínima para quedarse
-          <span class="rangebox"><input type="range" id="kThr" min="-2" max="1.5" step="0.1" value="-0.5"><output id="kThrOut" for="kThr">−0,5</output></span>
-        </label>
+      <form class="kctl" id="kForm" onsubmit="return false">
+        <div class="kc kc-clan"><span class="kc-k">Clan</span><select id="kClan" aria-label="Clan"></select></div>
+        <div class="kc">
+          <div class="kc-top"><span class="kc-k">Semanas a tener en cuenta</span><output class="kc-v" id="kWeeksOut" for="kWeeks">10</output></div>
+          <input class="slide" type="range" id="kWeeks" min="1" max="10" step="1" value="10" aria-label="Semanas a tener en cuenta">
+          <div class="kc-scale"><span>1</span><span>10</span></div>
+        </div>
+        <div class="kc" id="kThrBox">
+          <div class="kc-top"><span class="kc-k">Nota mínima para quedarse</span><output class="kc-v" id="kThrOut" for="kThr">−0,5</output></div>
+          <input class="slide" type="range" id="kThr" min="-2" max="2" step="0.1" value="-0.5" aria-label="Nota mínima para quedarse">
+          <div class="kc-scale"><span>−2</span><span>0</span><span>+2</span></div>
+        </div>
+        <div class="kc kc-goal">
+          <label class="kc-switch"><input type="checkbox" id="kGoalOn"><span class="sw-ui" aria-hidden="true"></span><span class="kc-k">Fijarla por media de medallas</span></label>
+          <div class="kc-goalrow" id="kGoalRow" hidden>
+            <span class="kc-num"><button type="button" class="kc-step" data-step="-50" aria-label="50 medallas menos">−</button><input type="number" id="kGoal" min="1000" max="4000" step="50" value="2200" inputmode="numeric" aria-label="Media de medallas por semana que se busca"><button type="button" class="kc-step" data-step="50" aria-label="50 medallas más">+</button><span class="kc-unit">medallas/sem.</span></span>
+            <span class="kc-hint" id="kGoalHint"></span>
+          </div>
+        </div>
       </form>
-      <p class="formula" id="kFormula"></p>
       <div class="tiles t4" id="kTiles"></div>
-      <div class="legend" aria-hidden="true" id="kLegend"></div>
       <div class="klist" id="kList"></div>
       <details class="howto"><summary>Notas del cálculo</summary><ul class="assume" id="kNotes"></ul></details>
+    </section>
+  </div>
+
+  <!-- ================= RECLUTAMIENTO ================= -->
+  <div id="panel-recruit" role="tabpanel" aria-labelledby="tab-recruit" hidden>
+    <section class="fig" aria-labelledby="rTitle">
+      <div class="fhead"><span class="fno">FIG. 07B</span><h2 id="rTitle">Reclutamiento</h2>
+        <div class="aside"><button type="button" class="btn" id="rCopy"><svg class="ic"><use href="#i-copy"/></svg><span>Copiar la lista</span></button></div></div>
+      <form class="kctl rctl" id="rForm">
+        <div class="kc"><span class="kc-k">País</span><select id="rCountry" aria-label="País"><option value="home">España</option><option value="any">Cualquiera</option></select></div>
+        <div class="kc">
+          <div class="kc-top"><span class="kc-k">Nota mínima</span><output class="kc-v" id="rMinOut" for="rMin">+1,0</output></div>
+          <input class="slide" type="range" id="rMin" min="-0.5" max="3" step="0.25" value="1" aria-label="Nota mínima">
+          <div class="kc-scale"><span>−0,5</span><span>+3</span></div>
+        </div>
+        <div class="kc">
+          <div class="kc-top"><span class="kc-k">Nivel mínimo</span><output class="kc-v" id="rLevelOut" for="rLevel">40</output></div>
+          <input class="slide" type="range" id="rLevel" min="1" max="70" step="1" value="40" aria-label="Nivel mínimo">
+          <div class="kc-scale"><span>1</span><span>70</span></div>
+        </div>
+        <div class="kc kc-goal">
+          <label class="kc-switch"><input type="checkbox" id="rNoClan" checked><span class="sw-ui" aria-hidden="true"></span><span class="kc-k">Solo jugadores sin clan</span></label>
+          <button class="go" id="rRun" type="submit"><svg class="ic"><use href="#i-search"/></svg>Buscar</button>
+        </div>
+      </form>
+      <p class="simstate" id="rState"></p>
+      <div class="rlist" id="rList"></div>
     </section>
   </div>
 
@@ -244,7 +277,7 @@
       <div class="fhead"><span class="fno">FIG. 08</span><h2 id="simTitle">Simulador de la semana</h2></div>
       <p class="fsub" hidden>Jugamos la semana miles de veces con el historial de cada clan y contamos cuántas veces acaba cada uno en cada puesto.</p>
       <form class="simctl" id="simForm">
-        <p class="simfixed"><b>500.000</b> simulaciones · variabilidad diaria <b>3,2 %</b> (la real de Furia Ibérica en sus 10 últimas semanas) · las semanas recientes pesan más (1 · 0,9 … 0,1)</p>
+        <p class="simfixed"><b>3.000.000</b> simulaciones · variabilidad diaria <b>3,2 %</b> (la real de Furia Ibérica en sus 10 últimas semanas) · las semanas recientes pesan más (1 · 0,9 … 0,1)</p>
         <label id="simTypeBox">Tipo de semana
           <select id="simType">
             <option value="auto">Carrera normal</option>
@@ -274,13 +307,6 @@
         <p class="subsub">La marca ámbar es lo esperado. La franja va del escenario pesimista al optimista: solo 1 de cada 10 simulaciones queda fuera por cada lado.</p>
         <div class="dist" id="simScore"></div>
 
-        <div class="tablewrap"><table class="dtable" id="simTable"></table></div>
-        <ul class="assume">
-          <li>Cada simulación elige al azar una de las últimas semanas de cada clan como su forma y reparte esas medallas entre los días de batalla, con la variabilidad diaria elegida.</li>
-          <li>Hoy parte de las medallas actuales y de los mazos pendientes: cada jugador pendiente juega o se deja mazos según su riesgo (pestaña Jugadores).</li>
-          <li>Carrera normal: el puesto de cada día da 3.000, 1.800, 1.000, 600 y 400 puntos de avance, más el bonus de las defensas del barco que siguen en pie; la meta está en 10.000. Se supone que no caen más defensas en los días que quedan. En coliseo gana quien suma más medallas.</li>
-          <li>El historial refleja cómo jugó cada clan, no cómo es hoy: si un rival ha cambiado mucho de miembros, tómalo con cautela.</li>
-        </ul>
       </div>
     </section>
 
@@ -304,10 +330,6 @@
     </section>
   </div>
 
-  <footer class="foot">
-    <p>Medallas por mazo: duelo ganado 250, batalla ganada 200, derrota 100 (75 en batalla de barco). Cada jugador tiene 4 mazos al día, con un tope de 200 mazos y 50 jugadores por clan.</p>
-    <p>Proyecto de fans, sin relación con Supercell. Datos de la API oficial de Clash Royale a través del proxy de RoyaleAPI. Código abierto: puedes alojar tu propia copia con tu servidor.</p>
-  </footer>
 </div>
 
 <script src="js/search.js?v=20261023"></script>

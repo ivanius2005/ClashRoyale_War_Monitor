@@ -126,18 +126,6 @@ def page_setup(out, title, subtitle, line2, when, clan):
     return doc
 
 
-CRITERIA = ("Medallas por semana: más de 2.400 → +1 y +0,1 por cada 100 más; 2.400 → +0,75; 2.200-2.399 → 0; "
-            "menos de 2.200 → −0,25 y −0,25 por cada 100 menos. Mazos sobre 160 (16 por semana × 10): 156 o más → +2; "
-            "148-155 → +0,5; menos de 148 → −0,2 por cada mazo que falte hasta 148.")
-
-
-def kick_note(k, opts):
-    thr = opts['threshold']
-    return (f"Nota = puntos de medallas + puntos de mazos, en las últimas {opts['weeksUsed']} semanas (también las que "
-            f"jugó en otro clan antes de entrar; hacen falta {opts.get('minWeeks', 4)} con datos). {CRITERIA} "
-            f"Expulsar por debajo de {dec(thr, 1)}; vigilar hasta {dec(opts.get('watchUpTo', thr + 1), 1)}; bien desde ahí.")
-
-
 def build_clan(data, out):
     r = data['report']; clan = r['clan']; opts = r['kickOpts']
     when = datetime.fromisoformat(data['generatedAt'].replace('Z', '+00:00')).astimezone(ZoneInfo(data.get('tz') or 'Europe/Madrid'))
@@ -170,7 +158,6 @@ def build_clan(data, out):
     else:
         story.append(Paragraph('Nadie está por debajo del umbral ni en zona de vigilancia.', S['p']))
     news = [p for p in players if p['kick']['verdict'] == 'nuevo']
-    story += [Spacer(1, 4), Paragraph(kick_note(None, opts), S['note'])]
     if news:
         story += [Spacer(1, 4), Paragraph('Con pocos datos para valorar (nuevos): ' + ', '.join(rich(p['name']) for p in news) + '.', S['note'])]
 
@@ -331,8 +318,7 @@ def build_player(data, out):
                         f'{fmt(k.get("medalsPerWeek"))} medallas por semana ({dec(k.get("medalScore"), 2)}) · '
                         f'{fmt(k.get("decks160"))} de 160 mazos ({dec(k.get("deckScore"), 2)}) · '
                         f'{k["counts"][0]} días sin jugar en {k["days"]} días de guerra'
-                        + (f' · {k["awayWeeks"]} semanas en otro clan' if k.get('awayWeeks') else '') + '.', S['p']),
-              Paragraph(kick_note(k, opts), S['note'])]
+                        + (f' · {k["awayWeeks"]} semanas en otro clan' if k.get('awayWeeks') else '') + '.', S['p'])]
     doc.build(story)
 
 

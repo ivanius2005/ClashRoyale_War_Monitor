@@ -26,13 +26,18 @@ const state = {
 // Ajustes de la pestaña de expulsiones (se recuerdan en este navegador)
 function loadKickPrefs() {
   // cw:kick3 = criterios por medallas/semana y mazos sobre 160 (los ajustes de fórmulas anteriores ya no valen)
-  const def = { weeks: 10, thr: window.CWSim.KICK.threshold };
+  const def = { weeks: 10, thr: window.CWSim.KICK.threshold, goalOn: false, goal: 2200 };
   try {
     const saved = JSON.parse(localStorage.getItem('cw:kick3') || 'null');
-    if (saved && isFinite(saved.weeks) && isFinite(saved.thr)) return Object.assign(def, { weeks: saved.weeks, thr: saved.thr });
+    if (saved && isFinite(saved.weeks) && isFinite(saved.thr)) {
+      return Object.assign(def, { weeks: saved.weeks, thr: saved.thr, goalOn: !!saved.goalOn, goal: isFinite(saved.goal) ? saved.goal : 2200 });
+    }
   } catch {}
   return def;
 }
+// Nota mínima a partir de una media de medallas: la nota de quien hace esa media y juega 148 de 160 mazos
+// (lo mínimo sin penalización por mazos)
+const goalThreshold = (goal) => Math.round((window.CWSim.medalPoints(goal) + window.CWSim.deckPoints(148)) * 100) / 100;
 function saveKickPrefs() { try { localStorage.setItem('cw:kick3', JSON.stringify(state.kick)); } catch {} }
 
 /* ---------- formato ---------- */
@@ -194,7 +199,7 @@ function rosterOf(tag) {
 }
 
 /* ---------- pestañas ---------- */
-const TABS = ['live', 'players', 'kick', 'sim', 'top'];
+const TABS = ['live', 'players', 'kick', 'recruit', 'sim', 'top'];
 function setTab(tab) {
   state.tab = tab;
   TABS.forEach((t) => {
@@ -206,6 +211,7 @@ function setTab(tab) {
   if (!state.model) return;
   if (tab === 'players') renderPlayers();
   if (tab === 'kick') renderKick();
+  if (tab === 'recruit') openRecruit();
   if (tab === 'sim') openSim();
   if (tab === 'top' && state.tag && (!state.rankingAt || Date.now() - state.rankingAt > 10 * 60e3)) loadRanking(state.tag);
 }
@@ -289,16 +295,15 @@ function renderMonth(s) {
   const podium = (b, label) => {
     if (!b || !b.top || !b.top.length) return '';
     return `<div class="mcard"><span class="mlabel">${esc(label)}</span>` + b.top.slice(0, 3).map((e, i) =>
-      `<div class="mrow r${i + 1}"><span class="mpos">${i + 1}</span><span class="mname">${esc(e.name)}${e.member === false ? ' <small>ya no está</small>' : ''}</span><span class="mval">${fmt(e.medals)}<small> · ${e.decks} mazos</small></span></div>`).join('') + '</div>';
+      `<div class="mrow p${i + 1}"><span class="mpos">${i + 1}</span><span class="mname">${esc(e.name)}${e.member === false ? ' <small>ya no está</small>' : ''}</span><span class="mval">${fmt(e.medals)}<small> · ${e.decks} mazos</small></span></div>`).join('') + '</div>';
   };
   $('monthTop').innerHTML = podium(cur, `Temporada ${cur.seasonId} · en curso`) + podium(mo.previous, `Temporada ${mo.previous ? mo.previous.seasonId : ''} · terminada`);
   const tl = cur.timeline;
-  if (!tl || !tl.members || !tl.members.length) { $('monthTable').innerHTML = ''; $('monthNote').textContent = ''; return; }
+  if (!tl || !tl.members || !tl.members.length) { $('monthTable').innerHTML = ''; return; }
   const mv = (x) => (x.delta == null ? '' : `<i class="${x.delta > 0 ? 'up' : x.delta < 0 ? 'dn' : 'eq'}" title="${esc(x.label)}: ${x.rank}º${x.delta ? ` (${x.delta > 0 ? 'sube' : 'baja'} ${Math.abs(x.delta)})` : ' (igual)'}">${x.delta > 0 ? `▲${x.delta}` : x.delta < 0 ? `▼${-x.delta}` : '–'}</i>`);
   $('monthTable').innerHTML = `<thead><tr><th>#</th><th>Jugador</th><th class="n">Medallas</th><th class="n">Mazos</th><th>Día a día</th></tr></thead><tbody>`
-    + tl.members.map((x) => `<tr><td class="mp">${x.rank}º</td><td class="who">${esc(x.name)}</td><td class="n">${fmt(x.medals)}</td><td class="n">${x.decks}</td><td><span class="mv">${x.moves.map(mv).join('')}</span></td></tr>`).join('')
+    + tl.members.map((x) => `<tr class="${x.rank <= 3 ? `m${x.rank}` : ''}"><td class="mp">${x.rank}º</td><td class="who">${esc(x.name)}</td><td class="n">${fmt(x.medals)}</td><td class="n">${x.decks}</td><td><span class="mv">${x.moves.map(mv).join('')}</span></td></tr>`).join('')
     + '</tbody>';
-  $('monthNote').textContent = `Los ${tl.members.length} miembros actuales, por medallas de la temporada. ▲ sube y ▼ baja tras cada día de guerra (${tl.points.slice(1).join(' → ')}); – se mantiene.`;
 }
 
 // Cabecera del clan: nombre, tag y menú de informes (sustituye a la antigua portada)
@@ -621,7 +626,7 @@ function renderPlayers() {
  * ========================================================= */
 function simOptions() {
   return {
-    runs: 500000,                    // fijas; se hacen por tandas con barra de progreso
+    runs: 3000000,                   // fijas; se hacen por tandas con barra de progreso
     dayCv: Sim.MODEL.futureDayCv,     // fija: la variabilidad real del clan
     // recency sin indicar: las semanas pesan 1 · 0,9 … 0,1 (la más reciente, 1)
     weekType: $('simType').value,
@@ -651,11 +656,11 @@ function openSim() {
   if (!state.sim) runSim();
 }
 
-// 500.000 simulaciones por tandas de 25.000, dejando respirar al navegador y mostrando el progreso
+// 3.000.000 de simulaciones por tandas de 50.000, dejando respirar al navegador y mostrando el progreso
 async function runSim() {
   if (!state.model || state.historyState !== 'ok' || state.simBusy) return;
   const opts = simOptions();
-  const CHUNK = 25000;
+  const CHUNK = 50000;
   const prog = (f) => {
     const v = Math.round(f * 100);
     $('simProgBar').style.width = `${v}%`;
@@ -710,7 +715,7 @@ function renderSim(res) {
   $('simOut').hidden = false;
   $('simBig').textContent = pct(own.p[1]);
   $('simCapTitle').textContent = `probabilidad de que ${own.name} gane ${what}`;
-  $('simCapSub').textContent = `${fmt(res.runs)} simulaciones en ${dec(res.ms / 1000, 2)} s, con los datos de las ${new Date(res.at || Date.now()).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}.`;
+  $('simCapSub').textContent = `${fmt(res.runs)} simulaciones en ${dec(res.ms / 1000, 1)} s`;
 
   $('simKpis').innerHTML = [
     tile({ icon: 'crown', k: 'Top 2', v: pct(own.p[1] + (own.p[2] || 0)), d: 'acabar 1º o 2º', tone: 'green' }),
@@ -757,14 +762,6 @@ function renderSim(res) {
       <span class="exp"><b>${fmt(c.medals.mean)}</b>esperadas</span>
     </div>`).join('');
 
-  const withProgress = !res.colosseum;
-  $('simTable').innerHTML = `<thead><tr>
-      <th scope="col">Clan</th><th scope="col">Gana</th><th scope="col">Top 2</th><th scope="col">Último</th>
-      <th scope="col">Puesto esperado</th>${withProgress ? '<th scope="col">Avance final</th><th scope="col">Cruza la meta</th>' : ''}<th scope="col">Medallas esperadas</th><th scope="col">Pesimista</th><th scope="col">Optimista</th>
-    </tr></thead><tbody>${sorted.map((c) => `<tr class="${c.own ? 'own' : ''}">
-      <td title="${esc(c.tag)}">${esc(c.name)}</td><td>${pct(c.p[1])}</td><td>${pct(c.p[1] + (c.p[2] || 0))}</td><td>${pct(c.p[n])}</td>
-      <td>${dec(c.expectedRank)}</td>${withProgress ? `<td>${fmt(c.progress.mean)}</td><td>${pct(c.pFinish)}</td>` : ''}<td>${fmt(c.medals.mean)}</td><td class="muted">${fmt(c.medals.p10)}</td><td class="muted">${fmt(c.medals.p90)}</td>
-    </tr>`).join('')}</tbody>`;
 }
 
 function sparkline(values) {
@@ -887,17 +884,8 @@ const VERDICT = {
   bien: { label: 'Bien', icon: 'users' },
   nuevo: { label: 'Sin evaluar', icon: 'clock' },
 };
-const DAY_ORDER = [4, 3, 0, 2, 1]; // de mejor a peor con los coeficientes por defecto
 const sdec = (n, d = 2) => (n == null || !isFinite(n)) ? '—' : (n < 0 ? '−' : n > 0 ? '+' : '') + Math.abs(n).toFixed(d).replace('.', ',');
 
-function kickSummary(counts) {
-  const parts = [];
-  if (counts[4]) parts.push(`${counts[4]} ${counts[4] === 1 ? 'completo' : 'completos'}`);
-  if (counts[3]) parts.push(`${counts[3]} con 3 mazos`);
-  if (counts[1] + counts[2]) parts.push(`${counts[1] + counts[2]} a medias (1-2)`);
-  if (counts[0]) parts.push(`${counts[0]} sin jugar`);
-  return parts.join(', ') || 'sin días';
-}
 
 // Enlaces a los PDF de jugadores con los ajustes de expulsión que se ven en la web
 const pdfOn = () => !!state.demo || !!(state.conf && state.conf.pdf);
@@ -925,12 +913,14 @@ function renderKick() {
   $('kClan').innerHTML = m.clans.map((c) => `<option value="${esc(c.tag)}"${c.tag === state.kickClan ? ' selected' : ''}>${esc(c.name)}${c.tag === m.own ? ' (tu clan)' : ''}</option>`).join('');
 
   const k = state.kick;
-  $('kThr').value = k.thr; $('kThrOut').textContent = sdec(k.thr, 1).replace(/^\+/, '');
-  $('kFormula').innerHTML = '<b>Nota</b> = puntos de medallas + puntos de mazos<br>' +
-    '<em>Medallas por semana:</em> más de 2.400 → +1 y +0,1 por cada 100 más · 2.400 → +0,75 · 2.200-2.399 → 0 · menos de 2.200 → −0,25 y −0,25 por cada 100 menos<br>' +
-    '<em>Mazos sobre 160:</em> 156 o más → +2 · 148-155 → +0,5 · menos de 148 → −0,2 por cada mazo que falte hasta 148<br>' +
-    `Expulsar por debajo de <b>${sdec(k.thr, 1).replace(/^\+/, '')}</b> · vigilar hasta <b>${sdec(k.thr + Sim.KICK.watchMargin, 1).replace(/^\+/, '')}</b> · bien desde ahí · hacen falta ${Sim.KICK.minWeeks} semanas con datos`;
-  $('kLegend').innerHTML = DAY_ORDER.map((d) => `<span><i class="sw d${d}"></i>${d === 4 ? 'los 4 mazos' : d === 0 ? 'sin jugar' : `${d} ${d === 1 ? 'mazo' : 'mazos'}`}</span>`).join('');
+  if (k.goalOn) k.thr = goalThreshold(k.goal);
+  const thrTxt = sdec(k.thr, k.goalOn ? 2 : 1).replace(/^\+/, '+');
+  $('kThr').value = Math.max(-2, Math.min(2, k.thr)); $('kThrOut').textContent = thrTxt;
+  $('kThr').disabled = k.goalOn; $('kThrBox').classList.toggle('locked', k.goalOn);
+  $('kGoalOn').checked = k.goalOn; $('kGoalRow').hidden = !k.goalOn;
+  if (document.activeElement !== $('kGoal')) $('kGoal').value = k.goal;
+  $('kGoalHint').innerHTML = `nota mínima <b>${esc(thrTxt)}</b>: la de quien hace ${fmt(k.goal)} medallas y juega 148 de 160 mazos`;
+  paintSlider($('kWeeks')); paintSlider($('kThr'));
 
   if (!historyReady()) {
     $('kTiles').innerHTML = ''; $('kNotes').innerHTML = '';
@@ -947,7 +937,7 @@ function renderKick() {
   const maxW = Math.max(1, Math.min(weeks.length, (state.history && state.history.weeksRequested) || 10));
   const nW = Math.min(k.weeks, maxW);
   $('kWeeks').max = maxW; $('kWeeks').value = nW;
-  $('kWeeksOut').textContent = nW === 1 ? '1 semana' : `${nW} semanas`;
+  $('kWeeksOut').innerHTML = `${nW}<small> ${nW === 1 ? 'semana' : 'semanas'}</small>`;
 
   const rep = Sim.kickReport(weeks, rosterOf(state.kickClan), { weeks: nW, threshold: k.thr, away: (entry && entry.away) || {} });
   const ownPdf = pdfOn() && isHomeClan() && state.kickClan === m.own; // los PDF son del clan de casa
@@ -960,7 +950,7 @@ function renderKick() {
   }
   const count = (v) => rep.rows.filter((r) => r.verdict === v).length;
   $('kTiles').innerHTML = [
-    tile({ icon: 'userx', k: 'Expulsar', v: String(count('expulsar')), d: `nota por debajo de ${sdec(k.thr, 1).replace(/^\+/, '')}`, tone: count('expulsar') ? 'red' : '' }),
+    tile({ icon: 'userx', k: 'Expulsar', v: String(count('expulsar')), d: `nota por debajo de ${thrTxt}`, tone: count('expulsar') ? 'red' : '' }),
     tile({ icon: 'alert', k: 'Vigilar', v: String(count('vigilar')), d: 'cerca del límite', tone: count('vigilar') ? 'amber' : '' }),
     tile({ icon: 'users', k: 'Bien', v: String(count('bien')), d: 'cumplen de sobra', tone: 'green' }),
     tile({ icon: 'clock', k: 'Sin evaluar', v: String(count('nuevo')), d: `menos de ${Sim.KICK.minWeeks} semanas con datos` }),
@@ -969,8 +959,6 @@ function renderKick() {
   // Una línea por jugador; el detalle va al tooltip y a la ficha PDF
   const row = (r) => {
     const v = VERDICT[r.verdict];
-    const total = r.days || 1;
-    const segs = DAY_ORDER.map((d) => (r.counts[d] ? `<i class="d${d}" style="width:${(r.counts[d] / total) * 100}%"></i>` : '')).join('');
     const est = r.exactShare != null && r.exactShare < 1 ? ` · ${r.exactShare === 0 ? 'estimado' : `${pct(1 - r.exactShare)} estimado`}` : '';
     const awayTxt = r.awayWeeks ? ` · ${r.awayWeeks} en otro clan${r.awayClans && r.awayClans.length ? ` (${r.awayClans.join(', ')})` : ''}` : '';
     const tip = `${r.weeks} ${r.weeks === 1 ? 'semana' : 'semanas'} con datos${awayTxt}${est}`;
@@ -979,7 +967,6 @@ function renderKick() {
     return `<div class="krow v-${r.verdict}">
       <div class="kv"><span class="verdict ${r.verdict}">${ic(v.icon)}${v.label}</span></div>
       <div class="kname"><span class="cname" title="${esc(tip)}">${esc(r.name)}</span>${pdf}</div>
-      <div class="kdays"><span class="dbar" title="${esc(kickSummary(r.counts))}" aria-label="${esc(kickSummary(r.counts))}">${segs}</span></div>
       <div class="kmed"><b>${r.medalsPerWeek != null ? fmt(r.medalsPerWeek) : '—'}</b><small>medallas/sem. · ${r.decks160 != null ? `${Math.round(r.decks160)}/160 mazos` : 'pocos datos'}${r.awayWeeks ? ` · ${r.awayWeeks} fuera` : ''}</small></div>
       <div class="kscore" title="${esc(scoreTip)}"><b>${r.score == null ? '—' : sdec(r.score).replace(/^\+/, '')}</b></div>
     </div>`;
@@ -987,9 +974,11 @@ function renderKick() {
   const flagged = rep.rows.filter((r) => r.verdict === 'expulsar' || r.verdict === 'vigilar');
   const fine = rep.rows.filter((r) => r.verdict === 'bien');
   const fresh = rep.rows.filter((r) => r.verdict === 'nuevo');
+  // Las listas desplegadas siguen abiertas aunque la página se actualice sola
+  const open = new Set([...$('kList').querySelectorAll('details.kmore[open]')].map((d) => d.dataset.k));
   $('kList').innerHTML = (flagged.length ? flagged.map(row).join('') : '<p class="rempty">Nadie por debajo de la nota ni en zona de vigilancia.</p>')
-    + (fine.length ? `<details class="kmore"><summary>Ver los ${fine.length} que están bien</summary>${fine.map(row).join('')}</details>` : '')
-    + (fresh.length ? `<details class="kmore"><summary>Sin evaluar: ${fresh.length} con pocos datos</summary>${fresh.map(row).join('')}</details>` : '');
+    + (fine.length ? `<details class="kmore" data-k="bien"${open.has('bien') ? ' open' : ''}><summary>Ver los ${fine.length} que están bien</summary>${fine.map(row).join('')}</details>` : '')
+    + (fresh.length ? `<details class="kmore" data-k="nuevo"${open.has('nuevo') ? ' open' : ''}><summary>Sin evaluar: ${fresh.length} con pocos datos</summary>${fresh.map(row).join('')}</details>` : '');
 
   const notes = [`Se tienen en cuenta las ${nW === 1 ? 'última semana' : `${nW} últimas semanas`} ya terminadas; la semana en curso cuenta cuando acaba.`];
   if (rep.exactWeeks < rep.weeksUsed) {
@@ -1008,9 +997,17 @@ function renderKick() {
 function kickInput() {
   const k = state.kick;
   k.weeks = Number($('kWeeks').value);
-  k.thr = Math.round(Number($('kThr').value) * 10) / 10;
+  k.goalOn = $('kGoalOn').checked;
+  const g = Number($('kGoal').value);
+  if (isFinite(g) && g >= 1000 && g <= 4000) k.goal = Math.round(g);
+  k.thr = k.goalOn ? goalThreshold(k.goal) : Math.round(Number($('kThr').value) * 10) / 10;
   saveKickPrefs();
   renderKick();
+}
+// Rango con el tramo recorrido en verde
+function paintSlider(el) {
+  const f = (Number(el.value) - Number(el.min)) / ((Number(el.max) - Number(el.min)) || 1);
+  el.style.setProperty('--f', `${Math.max(0, Math.min(1, f)) * 100}%`);
 }
 
 /* =========================================================
@@ -1202,7 +1199,13 @@ $('plTable').addEventListener('click', (e) => {
 });
 
 $('kClan').addEventListener('change', (e) => { state.kickClan = e.target.value; renderKick(); });
-['kWeeks', 'kThr'].forEach((id) => $(id).addEventListener('input', kickInput));
+['kWeeks', 'kThr', 'kGoal'].forEach((id) => $(id).addEventListener('input', kickInput));
+$('kGoalOn').addEventListener('change', kickInput);
+document.querySelectorAll('.kc-step').forEach((b) => b.addEventListener('click', () => {
+  const g = $('kGoal');
+  g.value = String(Math.min(4000, Math.max(1000, (Number(g.value) || 2200) + Number(b.dataset.step))));
+  kickInput();
+}));
 // En la demo no hay servidor: los botones de PDF explican qué hacen en la web real
 document.addEventListener('click', (e) => {
   const a = e.target.closest('a.btn.pdf, a.kpdf');
@@ -1297,6 +1300,86 @@ function saveSeen(tag, full) {
 }
 
 // ---------- Ranking de guerra (país top 100 y mundial top 1000) con la previsión de la semana ----------
+/* =========================================================
+ * RECLUTAMIENTO
+ * ========================================================= */
+const recruit = { busy: false, data: null, key: null };
+function recruitQuery() {
+  return new URLSearchParams({
+    country: $('rCountry').value === 'any' ? 'any' : 'home', min: $('rMin').value, level: $('rLevel').value, noclan: $('rNoClan').checked ? '1' : '0',
+  }).toString();
+}
+function recruitControls() {
+  $('rMinOut').textContent = sdec(Number($('rMin').value), Number($('rMin').value) % 0.5 ? 2 : 1);
+  $('rLevelOut').textContent = $('rLevel').value;
+  paintSlider($('rMin')); paintSlider($('rLevel'));
+}
+function openRecruit() {
+  recruitControls();
+  if (state.demo || !state.conf) { $('rState').textContent = 'El reclutamiento solo está en la web de la Raspberry (necesita la API en directo).'; $('rForm').hidden = true; return; }
+  if (!isHomeClan()) {
+    $('rForm').hidden = true; $('rCopy').hidden = true; $('rList').innerHTML = '';
+    $('rState').textContent = `Por ahora el reclutamiento solo está disponible para ${state.conf && state.conf.homeName ? state.conf.homeName : 'Furia Ibérica'}.`;
+    return;
+  }
+  $('rForm').hidden = false; $('rCopy').hidden = false;
+  if (!recruit.data || recruit.key !== recruitQuery()) runRecruit();
+}
+async function runRecruit() {
+  if (recruit.busy) return;
+  const key = recruitQuery();
+  recruit.busy = true; $('rRun').disabled = true;
+  $('rState').textContent = 'Buscando jugadores… revisa miles de jugadores del índice de guerra y comprueba sus perfiles (puede tardar unos segundos).';
+  $('rList').innerHTML = '<div class="rskel"></div><div class="rskel"></div><div class="rskel"></div>';
+  try {
+    const d = await getJson(`api/recruit?${key}`);
+    recruit.data = d; recruit.key = key;
+    renderRecruit(d);
+  } catch (e) {
+    $('rState').textContent = `No se pudo buscar: ${e.message}`;
+    $('rList').innerHTML = '';
+  } finally {
+    recruit.busy = false; $('rRun').disabled = false;
+  }
+}
+function renderRecruit(d) {
+  if (d.countryCode || d.country) {
+    let name = d.country;
+    try { if (d.countryCode) name = new Intl.DisplayNames(['es'], { type: 'region' }).of(d.countryCode) || name; } catch {}
+    $('rCountry').options[0].textContent = name;
+    recruit.countryName = name;
+  }
+  const when = new Date(d.fetchedAt).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+  $('rState').textContent = d.players.length
+    ? `${d.players.length} ${d.players.length === 1 ? 'jugador cumple' : 'jugadores cumplen'} los criterios (${fmt(d.candidates)} candidatos con buena nota entre ${fmt(d.indexedPlayers)} jugadores del índice; ${d.checked} perfiles comprobados a las ${when}).`
+    : `Nadie cumple ahora mismo los criterios (${fmt(d.candidates)} candidatos con buena nota; ${d.checked} perfiles comprobados a las ${when}). Prueba a bajar la nota o el nivel.`;
+  $('rList').innerHTML = d.players.map((p, i) => {
+    const bare = String(p.tag).replace('#', '');
+    const game = `https://link.clashroyale.com/es/?playerInfo?id=${encodeURIComponent(bare)}`;
+    const meta = [`<span class="rtag">${esc(p.tag)}</span>`, p.trophies != null ? `${fmt(p.trophies)} copas` : '', p.lastClan && p.lastClan.name ? `último clan: ${esc(p.lastClan.name)}` : '', p.clan ? `ahora en ${esc(p.clan.name)}` : 'sin clan']
+      .filter(Boolean).join(' · ');
+    return `<div class="rcard" style="--i:${i}">
+      <span class="rlv" title="Nivel de rey">${p.expLevel || '—'}</span>
+      <div class="rwho"><a class="rname" href="/p/${esc(bare)}">${esc(p.name || p.tag)}</a><span class="rmeta">${meta}</span></div>
+      <div class="rstat" title="Medallas ${sdec(p.medalScore)} + mazos ${sdec(p.deckScore)} · ${p.weeks} semanas con datos"><b>${sdec(p.score)}</b>${fmt(p.medalsPerWeek)} med./sem. · ${Math.round(p.decks160)}/160</div>
+      <div class="racts">
+        <a class="rbtn" href="/p/${esc(bare)}"><svg class="ic"><use href="#i-users"/></svg>Perfil</a>
+        <a class="rbtn game" href="${esc(game)}" target="_blank" rel="noopener"><svg class="ic"><use href="#i-link"/></svg>Abrir en el juego</a>
+      </div>
+    </div>`;
+  }).join('');
+}
+$('rForm').addEventListener('submit', (e) => { e.preventDefault(); recruit.data = null; runRecruit(); });
+['rMin', 'rLevel'].forEach((id) => $(id).addEventListener('input', recruitControls));
+$('rCopy').addEventListener('click', async () => {
+  const d = recruit.data;
+  if (!d || !d.players.length) return;
+  const text = `Jugadores para reclutar (${d.countryCode ? (recruit.countryName || d.country) : 'cualquier país'}):\n` + d.players.map((p) => `- ${p.name} ${p.tag}: nota ${sdec(p.score)}, ${fmt(p.medalsPerWeek)} medallas/sem., nivel ${p.expLevel} · https://link.clashroyale.com/es/?playerInfo?id=${String(p.tag).replace('#', '')}`).join('\n');
+  const label = $('rCopy').querySelector('span');
+  try { await navigator.clipboard.writeText(text); label.textContent = '¡Copiada!'; } catch { label.textContent = 'No se pudo copiar'; }
+  setTimeout(() => { label.textContent = 'Copiar la lista'; }, 1800);
+});
+
 async function loadRanking(tag) {
   if (state.demo || !state.conf) {
     $('rankGrid').innerHTML = '<p class="rank-note">El ranking solo está en la web de la Raspberry (necesita la API en directo).</p>';

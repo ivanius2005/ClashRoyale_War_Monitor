@@ -308,14 +308,6 @@ def build_playerwar(data, a, doc, story):
     r = e.get('rules') or {}
     if r:
         story.append(Spacer(1, 8))
-        story.append(Paragraph('Cómo se calcula', S['h2']))
-        story.append(Paragraph(
-            f"Son los requisitos de {esc(hn)} en «Expulsiones» (valores por defecto), con las 10 últimas semanas: nota = puntos de medallas + puntos de mazos. "
-            f"Medallas por semana: más de 2.400 → +1 y +0,1 por cada 100 más; 2.400 → +0,75; 2.200-2.399 → 0; menos de 2.200 → −0,25 y −0,25 por cada 100 menos. "
-            f"Mazos sobre 160: 156 o más → +2; 148-155 → +0,5; menos de 148 → −0,2 por cada mazo que falte hasta 148. "
-            f"Apto desde {dec(r['watchUpTo'], 1)}; a revisar entre {dec(r['threshold'], 1)} y {dec(r['watchUpTo'], 1)}; "
-            f"no apto por debajo de {dec(r['threshold'], 1)}. Hacen falta {r['minWeeks']} semanas con datos. "
-            f"Medallas: {fmt(e.get('medalsPerWeek'))} por semana ({dec(e.get('medalScore'), 2)}) · mazos: {fmt(e.get('decks160'))} de 160 ({dec(e.get('deckScore'), 2)}).", S['note']))
         rl = e.get('reliability') or {}
         if rl.get('index') is not None:
             pct = lambda x: '—' if x is None else f"{round(x * 100)} %"

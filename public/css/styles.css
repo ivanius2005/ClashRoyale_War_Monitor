@@ -702,3 +702,177 @@ body{font-size:14.5px;line-height:1.55}
 }
 
 .rnk-head.lose{color:var(--red);margin-top:0}
+
+/* =====================================================================
+   IVN_05 · v3 — misma línea que ivanius2005.es y la tienda:
+   negro puro, verde #39FF14, Geist + Geist Mono, rótulos de puntos (Doto),
+   tarjetas muy redondeadas, barra en píldora y movimiento sutil.
+   ===================================================================== */
+:root{
+  --bg:#000;--panel:#070b07;--panel-2:#0b110b;--panel-3:#121a12;
+  --line:rgba(140,255,120,.10);--line-2:rgba(140,255,120,.18);
+  --text:#e4ebe3;--muted:#a3aca2;--dim:#6b766a;--white:#f2f5f1;
+  --green:#39ff14;--green-2:#2bd10f;--green-soft:rgba(57,255,20,.14);--on-accent:#031003;
+  --sans:Geist,system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"Geist Mono",ui-monospace,Menlo,Consolas,monospace;
+  --dot:Doto,"Geist Mono",monospace;
+  --display:var(--sans);--r-lg:24px;
+  --ease:cubic-bezier(.22,1,.36,1);
+}
+html{background:var(--bg)}
+body{font:15px/1.55 var(--sans);color:var(--text);letter-spacing:-.005em;
+  background:
+    radial-gradient(900px 420px at 50% -120px,rgba(57,255,20,.16),transparent 70%),
+    radial-gradient(rgba(140,255,120,.09) 1px,transparent 1.3px) 0 0/22px 22px,
+    var(--bg);
+  background-attachment:scroll,fixed,scroll}
+.wrap{max-width:1120px;padding:18px 20px 64px}
+::selection{background:var(--green);color:var(--on-accent)}
+:focus-visible{outline:2px solid var(--green);outline-offset:3px}
+
+/* ---- Barra superior en píldora ---- */
+.top{display:flex;align-items:center;gap:14px;padding:8px 10px 8px 18px;border:1px solid var(--line);border-radius:999px;
+  background:rgba(6,10,6,.72);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);box-shadow:0 10px 40px -20px rgba(57,255,20,.25)}
+.brand{display:flex;align-items:baseline;gap:12px;text-decoration:none;flex:none}
+.top .mark{font:900 22px/1 var(--dot);color:var(--green);letter-spacing:.04em;text-shadow:0 0 14px rgba(57,255,20,.55)}
+.top .app{font:500 13px var(--mono);color:var(--muted);letter-spacing:0}
+.topfind{flex:1;min-width:0;display:flex;justify-content:center}
+.topfind[hidden]{display:none}
+.fig .tile .tv{font:600 26px/1.1 var(--sans);letter-spacing:-.02em}
+.topfind .cws{max-width:420px}
+.topfind .cws-msg:empty{display:none}
+.live{font:500 12.5px var(--mono);color:var(--muted);padding:6px 12px;border:1px solid var(--line);border-radius:999px;background:rgba(0,0,0,.35)}
+.led{position:relative;width:8px;height:8px}
+.led.on{background:var(--green);box-shadow:0 0 10px var(--green);animation:none}
+.led.on::after{content:"";position:absolute;inset:-4px;border-radius:50%;border:1.5px solid var(--green);animation:ping 1.8s var(--ease) infinite}
+@keyframes ping{0%{transform:scale(.6);opacity:.9}100%{transform:scale(2.1);opacity:0}}
+
+/* ---- Cabecera del clan ---- */
+.clanhero{margin-top:34px;text-align:left}
+.ch-top{display:flex;justify-content:space-between;align-items:flex-start;gap:18px;flex-wrap:wrap}
+.ch-kicker{display:inline-flex;align-items:center;gap:8px;font:500 12px var(--mono);color:var(--green);border:1px solid var(--line-2);border-radius:999px;padding:4px 12px;background:rgba(57,255,20,.05)}
+.ch-kicker::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green)}
+.clanhero h1{margin:14px 0 2px;font:600 clamp(34px,6.4vw,64px)/1.02 var(--sans);letter-spacing:-.035em;color:var(--white);overflow-wrap:anywhere}
+.ch-tag{font:500 13px var(--mono);color:var(--dim)}
+.clanhero .chips{margin-top:16px}
+.chip{font:500 12.5px var(--mono);border-color:var(--line-2);background:rgba(7,11,7,.7);padding:5px 12px}
+.clanhero .sumtext{margin:18px 0 0;font-size:16px;color:var(--muted);max-width:72ch}
+.clanhero .sumtext b{color:var(--white);font-weight:600}
+.sumtext .hl{color:var(--green)}
+.clanhero .tiles{margin-top:20px;gap:12px}
+.tile{position:relative;overflow:hidden;background:linear-gradient(180deg,rgba(18,26,18,.85),rgba(7,11,7,.85));border:1px solid var(--line);border-radius:20px;padding:16px 16px 14px;transition:border-color .3s,transform .3s var(--ease)}
+.tile:hover{border-color:var(--line-2);transform:translateY(-2px)}
+.tile .tk{font:500 11px var(--mono);text-transform:uppercase;letter-spacing:.08em;color:var(--dim)}
+.tile .tv{font:900 34px/1.05 var(--dot);letter-spacing:.01em;color:var(--white);margin-top:8px;font-variant-numeric:tabular-nums}
+.tile .tv small{font:500 13px var(--mono);color:var(--dim);letter-spacing:0}
+.tile .td{font-size:12.5px;color:var(--muted);margin-top:4px}
+.tile.t-green .tv{color:var(--green);text-shadow:0 0 18px rgba(57,255,20,.35)}
+.meter{height:5px;border-radius:999px;margin-top:10px}
+
+/* Menú de informes PDF */
+.dl{position:relative}
+.dl summary{list-style:none;display:inline-flex;align-items:center;gap:8px;cursor:pointer;font:600 13.5px var(--sans);color:var(--on-accent);background:var(--green);border-radius:999px;padding:10px 18px;box-shadow:0 0 0 0 rgba(57,255,20,.5);transition:box-shadow .3s,transform .2s}
+.dl summary::-webkit-details-marker{display:none}
+.dl summary:hover{box-shadow:0 0 28px -4px rgba(57,255,20,.7);transform:translateY(-1px)}
+.dl summary .ic{width:16px;height:16px}
+.dl-list{position:absolute;right:0;top:calc(100% + 8px);z-index:20;min-width:230px;display:grid;gap:2px;padding:6px;border:1px solid var(--line-2);border-radius:18px;background:rgba(8,12,8,.96);backdrop-filter:blur(14px);box-shadow:0 24px 60px -24px #000;animation:pop .22s var(--ease)}
+.dl-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;color:var(--text);text-decoration:none;font-size:14px}
+.dl-item:hover{background:var(--green-soft);color:var(--white)}
+.dl-item .ic{width:16px;height:16px;color:var(--green)}
+.dl-item.locked{opacity:.5;pointer-events:none}
+.dl-item.locked::after{content:"🔒";margin-left:auto;font-size:12px}
+@keyframes pop{from{opacity:0;transform:translateY(-6px) scale(.98)}to{opacity:1;transform:none}}
+
+/* ---- Pestañas: segmentado en píldora ---- */
+.tabs{margin-top:30px;padding:5px;gap:4px;border:1px solid var(--line);background:rgba(7,11,7,.75);border-radius:999px}
+.tabs button{font:500 13.5px var(--sans);color:var(--muted);border-radius:999px;padding:9px 16px;transition:background .25s,color .25s}
+.tabs button:hover{color:var(--white)}
+.tabs button[aria-selected="true"]{background:var(--green);color:var(--on-accent);box-shadow:0 0 24px -6px rgba(57,255,20,.8)}
+
+/* ---- Secciones ---- */
+.fig{margin-top:18px;border:1px solid var(--line);border-radius:var(--r-lg);background:linear-gradient(180deg,rgba(14,20,14,.82),rgba(5,8,5,.88));padding:24px 26px 26px}
+.fig::before,.fig::after{display:none}
+.fno{display:none}
+.fhead{margin-bottom:14px}
+.fhead h2,.fig h2{font:600 21px/1.2 var(--sans);letter-spacing:-.02em;color:var(--white)}
+.howto summary,.kcoef summary{font:500 13px var(--mono);color:var(--muted)}
+.btn,.go,.seg button,.rchip,.chip,.cws-go{font-family:var(--sans)}
+.btn{border-radius:999px;border-color:var(--line-2);background:rgba(7,11,7,.6);font-weight:600}
+.btn:hover{border-color:var(--green);color:var(--white)}
+.go{border-radius:999px;font-weight:600}
+.legend,.note,.fsub{font-size:12.5px;color:var(--dim)}
+
+/* ---- La carrera: una fila por clan ---- */
+.rrow{border-radius:18px;padding:12px 12px;transition:background .25s,border-color .25s}
+.rrow:hover{background:rgba(57,255,20,.04);border-color:var(--line)}
+.rrow[aria-expanded="true"]{background:rgba(57,255,20,.06);border-color:var(--line-2)}
+.rrow .pos{font:600 18px var(--mono);color:var(--dim)}
+.rrow .cname{font:600 15.5px var(--sans);color:var(--white)}
+.rrow .csub{font:500 11.5px var(--mono);color:var(--dim)}
+.bar{height:14px;background:rgba(255,255,255,.04)}
+.bar .b-now{border-radius:999px;transition:width 1.1s var(--ease)}
+.bar .b-range{transition:left 1.1s var(--ease),width 1.1s var(--ease)}
+.bar .b-proj{transition:left 1.1s var(--ease)}
+.rrow .nums .n{font:600 24px/1 var(--sans);letter-spacing:-.02em;color:var(--white);font-variant-numeric:tabular-nums}
+.prob{border-radius:16px;background:rgba(0,0,0,.35);border-color:var(--line)}
+.prob b{font:600 22px/1.05 var(--sans);letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.bprog{display:flex;align-items:center;gap:10px;margin-top:8px}
+.bprog .bt{position:relative;flex:0 0 38%;height:4px;border-radius:999px;background:rgba(255,255,255,.06);overflow:hidden}
+.bprog .bt i{position:absolute;top:0;bottom:0;left:0;border-radius:999px;background:var(--c,var(--green));transition:width 1.1s var(--ease)}
+.bprog .bt i.bx{background:repeating-linear-gradient(90deg,var(--c,var(--green)) 0 3px,transparent 3px 6px);opacity:.6}
+.bprog .btx{font:500 11.5px var(--mono);color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bprog .btx b{color:var(--text)} .bprog .btx em{font-style:normal;color:var(--green)}
+
+/* Detalle del clan: se despliega bajo su fila */
+.fig.drawer{margin:6px 0 14px;border-color:var(--line-2);background:rgba(5,9,5,.9);animation:drop .35s var(--ease)}
+@keyframes drop{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
+
+/* ---- Miembro del mes ---- */
+.mgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}
+.mcard{border:1px solid var(--line);border-radius:20px;padding:14px 16px;background:rgba(0,0,0,.3)}
+.mlabel{display:block;font:500 11px var(--mono);text-transform:uppercase;letter-spacing:.08em;color:var(--dim);margin-bottom:8px}
+.mrow{display:grid;grid-template-columns:2.2rem minmax(0,1fr) auto;gap:10px;align-items:center;padding:7px 0;border-top:1px solid var(--line)}
+.mrow:first-of-type{border-top:0}
+.mpos{font:600 18px var(--mono);color:var(--dim)}
+.mrow.r1 .mpos{color:var(--green);text-shadow:0 0 12px rgba(57,255,20,.6)}
+.mrow.r1 .mname{color:var(--white);font-weight:600;font-size:16px}
+.mname{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mname small{color:var(--dim);font-size:11px}
+.mval{font:500 13px var(--mono);color:var(--text);white-space:nowrap}
+.mval small{color:var(--dim)}
+#figMonth .tablewrap{margin-top:16px;max-height:520px;overflow:auto;border:1px solid var(--line);border-radius:16px}
+.mtable{width:100%;border-collapse:collapse;font-size:13.5px}
+.mtable th{position:sticky;top:0;background:#070b07;font:500 10.5px var(--mono);text-transform:uppercase;letter-spacing:.06em;color:var(--dim);text-align:left;padding:9px 10px;border-bottom:1px solid var(--line)}
+.mtable td{padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+.mtable .n{text-align:right;font-family:var(--mono)}
+.mtable .mp{font-family:var(--mono);color:var(--dim)}
+.mtable .who{white-space:normal;color:var(--white)}
+.mv{display:inline-flex;gap:3px}
+.mv i{font:500 10.5px var(--mono);font-style:normal;min-width:2em;text-align:center;border-radius:6px;padding:2px 3px;background:rgba(255,255,255,.04)}
+.mv i.up{color:var(--green)} .mv i.dn{color:var(--red)} .mv i.eq{color:var(--dim)}
+
+/* ---- Pie ---- */
+.foot{margin-top:40px;padding-top:18px;border-top:1px solid var(--line);font-size:12px;color:var(--dim)}
+
+/* ---- Movimiento: las secciones entran al llegar a ellas ---- */
+.anim .fig.seen,.anim .clanhero.seen{opacity:0;transform:translateY(16px);transition:opacity .7s var(--ease),transform .7s var(--ease)}
+.anim .fig.in,.anim .clanhero.in{opacity:1;transform:none}
+.anim .fig.in .rrow{animation:rise .6s var(--ease) both;animation-delay:calc(var(--i,0) * 70ms)}
+@keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+
+/* ---- Móvil ---- */
+@media (max-width:760px){
+  .top{flex-wrap:wrap;border-radius:26px;padding:10px 12px 12px 16px}
+  .topfind{order:3;flex-basis:100%}
+  .topfind .cws{max-width:none}
+  .top .app{display:none}
+  .top .live{margin-left:auto;flex-basis:auto;font-size:11.5px;padding:5px 10px}
+  .clanhero{margin-top:24px}
+  .clanhero .tiles{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .clanhero .tiles .tile:last-child:nth-child(odd){grid-column:1/-1}
+  .tile .tv{font-size:28px}
+  .fig{padding:18px 16px 20px;border-radius:20px}
+  .bprog .bt{flex-basis:30%}
+  .dl-list{right:auto;left:0}
+}

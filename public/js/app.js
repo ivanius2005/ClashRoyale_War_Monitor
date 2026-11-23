@@ -91,6 +91,7 @@ function defsHtml(st) {
 }
 
 function tile({ icon, k, v, d, tone, extra, style }) {
+  v = String(v).replace(/\s?%$/, '<small> %</small>'); // el % en pequeño (en la letra de puntos se lee mal)
   return `<div class="tile${tone ? ` t-${tone}` : ''}"${style ? ` style="${style}"` : ''}><div class="tk">${icon ? ic(icon) : ''}${k}</div><div class="tv">${v}</div>${d ? `<div class="td">${d}</div>` : ''}${extra || ''}</div>`;
 }
 
@@ -104,8 +105,15 @@ function store(k, v) { try { v == null ? localStorage.removeItem(k) : localStora
 function recall(k) { try { return localStorage.getItem(k); } catch { return null; } }
 function setUrl(params) {
   try {
-    const q = new URLSearchParams(params).toString();
-    history.replaceState(null, '', q ? `?${q}` : location.pathname);
+    const p = Object.assign({}, params);
+    let path = location.pathname;
+    if (p.tag && !CFG.demoOnly && !CFG.snapshot) {
+      const home = state.conf && state.conf.homeTag ? normTag(state.conf.homeTag) : null;
+      path = p.tag === home ? '/' : `/c/${p.tag}`;
+      delete p.tag;
+    }
+    const q = new URLSearchParams(p).toString();
+    history.replaceState(null, '', path + (q ? `?${q}` : '') + location.hash);
   } catch {}
 }
 async function getJson(path) {
@@ -209,9 +217,8 @@ function render() {
   $('intro').hidden = true;
   $('tabs').hidden = false;
   renderChips();
+  renderHero();
   renderSummary();
-  renderRiver();
-  renderPoints();
   renderRace();
   renderDetail();
   renderPending();
@@ -222,7 +229,6 @@ function renderChips() {
   const m = state.model;
   const chips = [`<span class="chip">Semana ${m.week}</span>`, `<span class="chip">${ic(m.training ? 'clock' : 'flag')}${esc(m.dayLabel)}</span>`];
   if (m.colosseum) chips.push(`<span class="chip amber">${ic('crown')}Coliseo: gana quien sume más medallas en la semana</span>`);
-  if (m.training) chips.push('<span class="chip amber">Entrenamiento: hoy no se suman medallas</span>');
   if (state.historyState === 'loading') chips.push('<span class="chip dim">Cargando historial…</span>');
   if (state.historyState === 'ok') {
     const own = relOf(m.own);
@@ -236,6 +242,81 @@ function renderChips() {
 function orderBy(key) {
   return [...state.model.clans].sort((a, b) => (b[key].now - a[key].now) ||
     ((viewVals(b, key).exp || 0) - (viewVals(a, key).exp || 0)));
+}
+
+// ---------- Animaciones: las secciones aparecen al llegar a ellas y las cifras grandes cuentan hasta su valor ----------
+const reduceMotion = () => window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const reveal = {
+  io: null,
+  start() {
+    if (reduceMotion() || !('IntersectionObserver' in window)) return;
+    document.documentElement.classList.add('anim');
+    this.io = new IntersectionObserver((es) => es.forEach((e) => {
+      if (e.isIntersecting) { e.target.classList.add('in'); this.io.unobserve(e.target); }
+    }), { rootMargin: '0px 0px -6% 0px' });
+    const watch = () => document.querySelectorAll('.fig:not(.seen), .clanhero:not(.seen)').forEach((el) => { el.classList.add('seen'); this.io.observe(el); });
+    watch();
+    new MutationObserver(watch).observe(document.body, { subtree: true, attributes: true, attributeFilter: ['hidden'] });
+  },
+};
+// Cuenta hasta el número (solo la primera vez que aparece cada cifra, para no marear al actualizar cada minuto)
+const counted = new Set();
+function countUp(root) {
+  if (reduceMotion()) return;
+  root.querySelectorAll('.tv').forEach((el) => {
+    const m = /^([^\d]*)([\d.]+)(.*)$/s.exec(el.innerHTML);
+    const key = el.closest('.tile') && el.closest('.tile').querySelector('.tk') ? el.closest('.tile').querySelector('.tk').textContent : null;
+    if (!m || !key || counted.has(key)) return;
+    counted.add(key);
+    const target = Number(m[2].replace(/\./g, ''));
+    if (!isFinite(target) || target < 2) return;
+    const t0 = performance.now(); const dur = 700;
+    const tick = (now) => {
+      const f = Math.min(1, (now - t0) / dur); const e = 1 - Math.pow(1 - f, 3);
+      el.innerHTML = m[1] + fmt(Math.round(target * e)) + m[3];
+      if (f < 1) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  });
+}
+
+// ---------- Miembro del mes: los 3 primeros de la temporada y todos los miembros con sus subidas y bajadas ----------
+function renderMonth(s) {
+  const mo = s && s.monthly;
+  const cur = mo && mo.current;
+  $('figMonth').hidden = !(cur && cur.top && cur.top.length);
+  if ($('figMonth').hidden) return;
+  const podium = (b, label) => {
+    if (!b || !b.top || !b.top.length) return '';
+    return `<div class="mcard"><span class="mlabel">${esc(label)}</span>` + b.top.slice(0, 3).map((e, i) =>
+      `<div class="mrow r${i + 1}"><span class="mpos">${i + 1}</span><span class="mname">${esc(e.name)}${e.member === false ? ' <small>ya no está</small>' : ''}</span><span class="mval">${fmt(e.medals)}<small> · ${e.decks} mazos</small></span></div>`).join('') + '</div>';
+  };
+  $('monthTop').innerHTML = podium(cur, `Temporada ${cur.seasonId} · en curso`) + podium(mo.previous, `Temporada ${mo.previous ? mo.previous.seasonId : ''} · terminada`);
+  const tl = cur.timeline;
+  if (!tl || !tl.members || !tl.members.length) { $('monthTable').innerHTML = ''; $('monthNote').textContent = ''; return; }
+  const mv = (x) => (x.delta == null ? '' : `<i class="${x.delta > 0 ? 'up' : x.delta < 0 ? 'dn' : 'eq'}" title="${esc(x.label)}: ${x.rank}º${x.delta ? ` (${x.delta > 0 ? 'sube' : 'baja'} ${Math.abs(x.delta)})` : ' (igual)'}">${x.delta > 0 ? `▲${x.delta}` : x.delta < 0 ? `▼${-x.delta}` : '–'}</i>`);
+  $('monthTable').innerHTML = `<thead><tr><th>#</th><th>Jugador</th><th class="n">Medallas</th><th class="n">Mazos</th><th>Día a día</th></tr></thead><tbody>`
+    + tl.members.map((x) => `<tr><td class="mp">${x.rank}º</td><td class="who">${esc(x.name)}</td><td class="n">${fmt(x.medals)}</td><td class="n">${x.decks}</td><td><span class="mv">${x.moves.map(mv).join('')}</span></td></tr>`).join('')
+    + '</tbody>';
+  $('monthNote').textContent = `Los ${tl.members.length} miembros actuales, por medallas de la temporada. ▲ sube y ▼ baja tras cada día de guerra (${tl.points.slice(1).join(' → ')}); – se mantiene.`;
+}
+
+// Cabecera del clan: nombre, tag y menú de informes (sustituye a la antigua portada)
+function renderHero() {
+  const m = state.model;
+  const o = m.clans.find((c) => c.tag === m.own) || m.clans[0];
+  $('hero').hidden = false;
+  $('heroName').textContent = o.name;
+  $('heroTag').textContent = o.tag;
+  $('heroKicker').textContent = m.colosseum ? 'Semana de coliseo' : 'Guerra de clanes';
+  document.title = `${o.name} · Guerra de clanes`;
+  syncPdfMenu();
+}
+
+// El menú «Informes PDF» se ve si alguno de sus informes está disponible (activo o bloqueado)
+function syncPdfMenu() {
+  const any = ['pdfNow', 'pdfDay', 'pdfWeek', 'pdfCol'].some((id) => $(id) && !$(id).hidden);
+  $('pdfMenu').hidden = !any;
 }
 
 function renderSummary() {
@@ -286,133 +367,7 @@ function renderSummary() {
     tile({ icon: 'target', k: m.colosseum ? 'Total esperado' : 'Final esperado', v: t ? fmt(t.expected) : '…', d: t ? `entre ${fmt(t.p10)} y ${fmt(t.p90)}` : 'calculando', tone: 'amber' }),
     tile({ icon: 'crown', k: m.colosseum ? '1º al cerrar el día' : 'Gana el día', v: t ? pct(t.pWin) : '…', d: t ? `puesto esperado ${dec(t.expectedRank)}` : '', tone: t && t.pWin >= 0.5 ? 'green' : 'amber' }),
   ].join('');
-}
-
-/* ---------- el río: la carrera de barcos de la semana ---------- */
-function renderRiver() {
-  const m = state.model;
-  const wk = Sim.weekProgress(m);
-  // Avance al cerrar cada día de esta semana (un tramo de la barra por día)
-  const race = m.race || {};
-  const pi = race.periodIndex || 0;
-  const weekStart = pi - (((pi % 7) + 7) % 7);
-  const logs = (race.periodLogs || []).filter((l) => l.periodIndex >= weekStart + 3 && l.periodIndex < pi)
-    .sort((a, b) => a.periodIndex - b.periodIndex);
-  const rows = m.clans.map((c) => {
-    const st = wk.clans[c.tag];
-    const t = today(c);
-    const now = wk.colosseum ? c.fame : st.progress;
-    let next = null;
-    if (t) next = wk.colosseum ? t.expected : (t.expPoints != null ? now + t.expPoints : null);
-    const ends = wk.colosseum ? [] : logs.map((l) => {
-      const e = (l.items || []).find((x) => x.clan && x.clan.tag === c.tag);
-      return e && e.progressEndOfDay != null ? e.progressEndOfDay : null;
-    }).filter((v) => v != null);
-    return { c, st, t, now, next, ends };
-  });
-  const scale = wk.colosseum
-    ? niceMax(Math.max(1, ...rows.map((r) => Math.max(r.now, r.next || 0))))
-    : Sim.RULES.finishLine;
-  rows.sort((a, b) => (b.now - a.now) || ((b.next || 0) - (a.next || 0)));
-
-  const clamp01 = (v) => Math.max(0, Math.min(1, v));
-  const p100 = (v) => (v * 100).toFixed(2);
-  $('river').className = 'river';
-  $('river').innerHTML = rows.map(({ c, st, t, now, next, ends }, idx) => {
-    const x = clamp01(now / scale);
-    const gx = next != null ? clamp01(next / scale) : x;
-    const ghost = !m.training && next != null && gx - x > 0.004;
-    // Tramos: uno por día cerrado (en coliseo, uno solo con las medallas de la semana)
-    const pts = ends.length ? ends.slice() : [];
-    if (!pts.length || pts[pts.length - 1] < now) pts.push(now);
-    let prev = 0;
-    const segs = pts.map((v, i) => {
-      const a0 = clamp01(prev / scale), b0 = clamp01(v / scale);
-      const day = ends.length && i < ends.length ? i + 1 : null;
-      const html = b0 > a0 ? `<span class="day" style="left:${p100(a0)}%;width:${p100(b0 - a0)}%" title="${day ? `Día ${day}: +${fmt(v - prev)}` : fmt(v)}">${day && b0 - a0 > 0.07 ? `<span class="dlab">D${day}</span>` : ''}</span>` : '';
-      prev = v;
-      return html;
-    }).join('');
-    const ticks = wk.colosseum ? '' : [0.25, 0.5, 0.75].map((f) => `<span class="tick" style="left:${f * 100}%"></span>`).join('');
-    let val;
-    let sub;
-    if (m.training) { val = '0'; sub = 'aún sin empezar'; }
-    else if (!wk.colosseum && st.finished) { val = '¡Meta!'; sub = `${fmt(now)} de avance`; }
-    else if (wk.colosseum) { val = fmt(now); sub = next != null ? `<em>+${fmt(next - now)}</em> hoy` : 'medallas'; }
-    else { val = fmt(now); sub = t && t.expPoints != null ? `<em>+${fmt(t.expPoints)}</em> hoy` : `de ${fmt(scale)}`; }
-    const aria = `${c.name}: ${m.training ? 'aún sin empezar' : `${fmt(now)}${wk.colosseum ? ' medallas' : ` de ${fmt(scale)}`}`}${ghost ? `, se espera llegar a ${fmt(next)} al cerrar hoy` : ''}`;
-    const crown = idx === 0 && now > 0 ? '<svg class="ic crown" aria-hidden="true"><use href="#i-crown"/></svg>' : '';
-    const label = wk.colosseum
-      ? clanLabel(c)
-      : `<span class="cn">${shield(c)}<span><span class="cname">${crown}${esc(c.name)}</span>${defsHtml(st)}</span></span>`;
-    return `<div class="lane${c.tag === m.own ? ' own' : ''}" style="--c:${colorOf(c.tag)}" role="listitem" aria-label="${esc(aria)}">
-      ${label}
-      <div class="track" aria-hidden="true">${ticks}${segs}${ghost ? `<span class="exp" style="left:${p100(x)}%;width:${p100(gx - x)}%"></span>` : ''}${wk.colosseum ? '' : '<span class="goal"></span>'}</div>
-      <div class="lval"><b>${val}</b><small>${sub}</small></div>
-    </div>`;
-  }).join('');
-  $('river').setAttribute('role', 'list');
-
-  $('riverSub').textContent = m.training
-    ? 'Días de entrenamiento: la carrera empieza con el primer día de batalla.'
-    : wk.colosseum
-      ? 'En coliseo no hay meta: cuentan las medallas de toda la semana. La parte rayada es lo que se espera que sume cada clan al cerrar hoy.'
-      : 'Cada día, el orden por medallas da puntos de avance y cada defensa del barco que sigue en pie suma un extra; gana quien llega antes a 10.000. Cada tramo es un día (D1, D2…) y la parte rayada, lo que se espera sumar al cerrar hoy.';
-  const legend = ['<span><i class="lg"></i>Avance hasta ahora</span>'];
-  if (!m.training) legend.push('<span><i class="lg exp"></i>Esperado al cerrar hoy</span>');
-  if (!wk.colosseum) legend.push(`<span><i class="lg goal"></i>Meta: ${fmt(Sim.RULES.finishLine)} puntos de avance</span>`);
-  legend.push('<span><svg class="ic crown"><use href="#i-crown"/></svg>Va primero</span>');
-  if (wk.missingLogs && !wk.colosseum) legend.push('<span class="warn">Sin datos del avance de días anteriores</span>');
-  $('riverLegend').innerHTML = legend.join('');
-}
-
-/* ---------- puntos de avance de hoy: puesto + defensas ---------- */
-function renderPoints() {
-  const m = state.model;
-  const wk = Sim.weekProgress(m);
-  $('figPoints').hidden = wk.colosseum;
-  if (wk.colosseum) return;
-  const moves = Sim.RULES.movement;
-  const n = m.clans.length;
-  const rows = m.clans.map((c) => ({ c, st: wk.clans[c.tag], t: today(c) }))
-    .sort((a, b) => (b.st.progress - a.st.progress) || ((b.t ? b.t.expPoints : 0) - (a.t ? a.t.expPoints : 0)));
-
-  $('ptsSub').textContent = m.training
-    ? 'Lo que avanzará cada barco en cada día de batalla según el puesto en que quede por medallas, más lo que suman sus defensas en pie. La carrera aún no ha empezado.'
-    : 'Lo que avanzará cada barco al cerrar el día: los puntos de su puesto por medallas más los de sus defensas en pie. Debajo de cada cifra, la probabilidad de quedar en ese puesto.';
-
-  $('ptsTitle').textContent = m.training ? 'Puntos de avance por día' : 'Puntos de avance de hoy';
-  const head = Array.from({ length: n }, (_, k) => `<th scope="col">${ord(k + 1)}<small>+${fmt(moves[k] || 0)}</small></th>`).join('');
-  $('ptsTable').innerHTML = `<thead><tr><th scope="col">Clan</th><th scope="col">Defensas</th>${head}${m.training ? '' : '<th scope="col" style="text-align:right;padding-right:12px">Esperado hoy</th>'}</tr></thead>
-    <tbody>${rows.map(({ c, st, t }) => {
-      const bonus = st.finished ? 0 : (st.defenseBonus || 0);
-      const best = t ? t.p.indexOf(Math.max(...t.p.slice(1))) : -1;
-      const cells = Array.from({ length: n }, (_, i) => {
-        const k = i + 1;
-        const pts = st.finished ? 0 : (moves[i] || 0) + bonus;
-        const p = t ? t.p[k] : null;
-        const cls = ['pcell', p != null && k === best ? 'best' : '', p != null && p < 0.005 ? 'zero' : ''].filter(Boolean).join(' ');
-        return `<td class="${cls}" style="--p:${p == null ? 0 : p.toFixed(3)}" title="${esc(`${c.name} ${ord(k)}: ${fmt(moves[i] || 0)} del puesto + ${fmt(bonus)} de defensas`)}"><span class="pl">${ord(k)}</span><b>${st.finished ? '—' : fmt(pts)}</b>${p != null ? `<small>${pct(p)}</small>` : ''}</td>`;
-      }).join('');
-      const exp = st.finished
-        ? '<b>¡Meta!</b><small>ya no suma</small>'
-        : t && t.expPoints != null
-          ? `<span class="pl">Esperado hoy</span><b>+${fmt(t.expPoints)}</b><small>quedará en ${fmt(st.progress + t.expPoints)}</small>`
-          : `<b>—</b><small>${m.training ? 'la carrera aún no empieza' : 'sin previsión'}</small>`;
-      const defs = st.defenses == null
-        ? '<b>?</b>sin datos aún'
-        : `<b>${st.defenses}${st.defenseSource === 'estimado' ? '*' : ''}<span class="dsuf"> defensas</span></b>+${fmt(bonus)} al día`;
-      return `<tr style="--c:${colorOf(c.tag)}"><td class="clan">${clanLabel(c)}</td><td class="dcell">${defs}</td>${cells}${m.training ? '' : `<td class="ecell">${exp}</td>`}</tr>`;
-    }).join('')}</tbody>`;
-
-  const notes = ['Cada defensa en pie suma entre 59 y 5 puntos al cerrar el día: las primeras que se construyeron valen más. Con las 15 son 435.'];
-  const anyReal = rows.some((r) => r.st.defenseSource === 'real');
-  const anyEst = rows.some((r) => r.st.defenseSource === 'estimado');
-  const anyNone = rows.some((r) => r.st.defenses == null);
-  if (anyReal) notes.push('Las defensas son las que seguían en pie al cerrar ayer: se supone que hoy no cae ninguna más.');
-  if (anyEst) notes.push('* Estimado con la semana anterior, porque las defensas se reponen cada semana. El dato real llega al cerrar el primer día de batalla.');
-  if (anyNone) notes.push('Aún no hay datos de defensas de algunos clanes: se sabrán al cerrar el primer día de batalla.');
-  $('ptsNotes').innerHTML = notes.map((x) => `<li>${esc(x)}</li>`).join('');
+  countUp($('sumKpis'));
 }
 
 function versus(c, own, key) {
@@ -428,7 +383,7 @@ function renderRace() {
   const key = m.colosseum ? state.view : 'day';
   $('viewSeg').hidden = !m.colosseum;
   $('viewSeg').querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.view === key)));
-  $('raceTitle').textContent = key === 'week' ? 'Medallas de la semana' : 'Medallas de hoy';
+  $('raceTitle').textContent = key === 'week' ? 'La carrera · total de la semana' : m.training ? 'La carrera · empieza el jueves' : 'La carrera de hoy';
   $('raceSub').textContent = m.colosseum
     ? 'En coliseo cuenta el total de la semana. Toca un clan para ver su detalle.'
     : 'El orden de hoy decide cuánto avanza cada barco al cerrar el día. Toca un clan para ver su detalle.';
@@ -436,6 +391,20 @@ function renderRace() {
 
   const own = m.clans.find((c) => c.tag === m.own);
   const clans = orderBy(key);
+  const wk = Sim.weekProgress(m);
+  const goal = Sim.RULES.finishLine;
+  // Avance del barco en la semana (no en coliseo): lo que antes eran el «río» y la tabla de puntos
+  const boat = (c, t) => {
+    if (wk.colosseum || m.training) return '';
+    const st = wk.clans[c.tag] || {};
+    const now = st.progress || 0;
+    const add = st.finished ? 0 : t && t.expPoints != null ? t.expPoints : 0;
+    const p0 = Math.min(100, (now / goal) * 100);
+    const p1 = Math.min(100 - p0, (add / goal) * 100);
+    const defs = st.defenses == null ? '' : ` · ${st.defenses}${st.defenseSource === 'estimado' ? '*' : ''} defensas`;
+    return `<span class="bprog" title="Avance del barco hacia la meta de ${fmt(goal)} puntos"><span class="bt"><i style="width:${p0}%"></i><i class="bx" style="left:${p0}%;width:${p1}%"></i></span>`
+      + `<span class="btx">${st.finished ? '<b>¡Meta!</b>' : `Barco <b>${fmt(now)}</b> / ${fmt(goal)}${add ? ` · <em>+${fmt(add)} hoy</em>` : ''}`}${defs}</span></span>`;
+  };
   const top = niceMax(Math.max(1, ...clans.map((c) => c[key].max)));
   const x = (v) => Math.max(0, Math.min(100, (v / top) * 100));
 
@@ -448,7 +417,7 @@ function renderRace() {
     const isOwn = c.tag === m.own;
     const usable = c.usedTotal + c.remaining;
     const label = `${c.name}: ${fmt(v.now)} medallas, final esperado ${fmt(v.exp)}, ${plural(c.remaining, 'mazo pendiente', 'mazos pendientes')}${t ? `, ${pct(t.pWin)} de ganar el día` : ''}`;
-    return `<button type="button" class="rrow grid-row" data-tag="${esc(c.tag)}" style="--c:${colorOf(c.tag)}" aria-pressed="${c.tag === state.selected}" aria-label="${esc(label)}">
+    return `<button type="button" class="rrow grid-row" data-tag="${esc(c.tag)}" style="--c:${colorOf(c.tag)};--i:${i}" aria-expanded="${state.open === c.tag}" aria-pressed="${c.tag === state.selected}" aria-label="${esc(label)}">
       <span class="pos">${i + 1}</span>
       <span class="cn">${shield(c)}<span>
         <span class="cname">${esc(c.name)}</span>
@@ -463,6 +432,7 @@ function renderRace() {
         </span>
         <span class="decks" title="Mazos jugados hoy: ${c.usedTotal} de ${usable}"><i style="width:${usable ? c.usedTotal / usable * 100 : 0}%"></i></span>
         <span class="dtext">${pct(usable ? c.usedTotal / usable : 0)} de mazos jugados, quedan ${c.remaining}</span>
+        ${boat(c, t)}
       </span>
       <span class="nums">
         <span class="n">${fmt(v.now)}</span>
@@ -498,6 +468,11 @@ function dayTiles(c, vals, now, t, training) {
 function renderDetail() {
   const m = state.model;
   const c = selectedClan();
+  // Se despliega debajo de la fila del clan que se ha tocado
+  const fig = $('figDetail');
+  const row = state.open && $('race').querySelector(`.rrow[data-tag="${CSS.escape(state.open)}"]`);
+  fig.hidden = !row;
+  if (row) row.after(fig);
   const t = today(c);
   $('dShield').innerHTML = shield(c);
   $('dName').textContent = c.name;
@@ -1198,10 +1173,11 @@ $('dSwitch').addEventListener('click', () => {
 $('race').addEventListener('click', (e) => {
   const row = e.target.closest('.rrow');
   if (!row || !state.model) return;
-  state.selected = row.dataset.tag;
-  state.plClan = row.dataset.tag;
+  const tag = row.dataset.tag;
+  state.open = state.open === tag ? null : tag;
+  state.selected = tag;
+  state.plClan = tag;
   renderRace(); renderDetail(); renderPending();
-  if (window.matchMedia('(max-width:760px)').matches) $('dName').scrollIntoView({ behavior: 'smooth', block: 'start' });
 });
 
 $('viewSeg').addEventListener('click', (e) => {
@@ -1414,6 +1390,7 @@ async function loadNews(tag) {
       try { state.report = await getJson('api/report/latest'); } catch { state.report = null; }
     }
     renderNews();
+    renderMonth(sum);
     saveSeen(tag, sum);
   } catch {
     $('figNews').hidden = !state.summary; // si ya había datos, se dejan los últimos
@@ -1438,6 +1415,7 @@ function renderNews() {
   setPdfButton($('pdfDay'), 'api/day.pdf');
   setPdfButton($('pdfWeek'), 'api/week.pdf');
   setPdfButton($('pdfCol'), 'api/colosseum.pdf');
+  syncPdfMenu();
 
   // Desde tu última visita
   if (!state.prevSeen) {
@@ -1481,6 +1459,9 @@ function renderNews() {
 
 async function boot() {
   const q0 = new URLSearchParams(location.search);
+  if (window.CWSearch && !CFG.demoOnly && !CFG.snapshot) window.CWSearch.mount($('cwFind'));
+  else $('cwFind').hidden = true;
+  reveal.start();
   renderRecent();
   if (CFG.snapshot) {
     // Foto fija de datos reales: sin buscador ni escenarios
@@ -1519,7 +1500,8 @@ async function boot() {
   } else if (state.locked) {
     load(state.locked);
   } else {
-    const t = normTag(q.get('tag') || recall('cw:lastTag') || (conf && conf.homeTag) || ''); // sin indicar: el clan de casa
+    // /c/TAG (o ?tag=) manda; en «/» se abre el clan de casa
+    const t = normTag(window.CW_TAG || q.get('tag') || (conf && conf.homeTag) || recall('cw:lastTag') || '');
     if (TAG_RE.test(t)) { $('tag').value = t; load(t); }
   }
 }

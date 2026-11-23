@@ -47,17 +47,9 @@ const scope = (sel, rules) => rules.trim().split('\n').map((r) => {
 }).join('\n');
 
 const THEME = `
-/* ---- añadido por build-demo: bordes seguros del móvil y tema claro ---- */
-:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
-html{scroll-padding-top:env(safe-area-inset-top,0px)}
-body{padding:0;min-height:0;background-color:var(--bg)}
-@media (prefers-color-scheme: light){
-  :root:not([data-theme="dark"]){${LIGHT}}
-${scope(':root:not([data-theme="dark"])', LIGHT_RULES)}
-}
-:root[data-theme="light"]{${LIGHT}}
-${scope(':root[data-theme="light"]', LIGHT_RULES)}
-`;
+/* ---- añadido por build-demo: bordes seguros del móvil; siempre en oscuro (verde y negro) ---- */
+:root{color-scheme:dark;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}`;
 
 // Con SNAPSHOT=archivo.js se monta una "foto real": ese archivo sustituye a los datos inventados
 // (define window.CWDemo con datos de verdad) y CONFIG_JSON añade { snapshot: {...} } a la configuración.
@@ -71,7 +63,8 @@ const swap = (from, to) => {
   html = html.replace(from, () => to);
 };
 
-swap('<title>Monitor de guerra de clanes · Clash Royale</title>', `<title>${SNAP ? (process.env.TITLE || 'Foto real · Monitor de guerra de clanes') : 'Demo · Monitor de guerra de clanes'}</title>`);
+swap('<title>Guerra de clanes · IVN_05</title>', `<title>${SNAP ? (process.env.TITLE || 'Foto real · Guerra de clanes') : 'Vista previa · Guerra de clanes'}</title>`);
+swap('<script src="js/search.js"></script>', ''); // el buscador necesita el servidor
 swap('<link rel="stylesheet" href="css/styles.css">', `<style>\n${read('public/css/styles.css')}\n${THEME}</style>`);
 swap('<script src="js/config.js"></script>', `<script>window.CW_CONFIG = Object.assign({ apiBase: '', demoOnly: true }, ${EXTRA_CONFIG});</script>`);
 for (const f of ['calc', 'sim', 'news', 'demo', 'app']) {

@@ -3,13 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Monitor de guerra de clanes · Clash Royale</title>
+<title>Guerra de clanes · IVN_05</title>
 <meta name="description" content="Sigue la guerra de clanes de Clash Royale en directo, mira qué jugadores suelen dejarse mazos y simula tus opciones de ganar con el historial de las últimas semanas.">
-<meta name="theme-color" content="#050705">
+<meta name="theme-color" content="#000000">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23050705'/%3E%3Cpath d='M15 6v13H8Z' fill='%2300ff41'/%3E%3Cpath d='M17 9l6 10h-6Z' fill='%2300ff41' opacity='.8'/%3E%3Cpath d='M5 21h22l-3 5H8Z' fill='%2300ff41'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Lilita+One&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Doto:wght@700;900&family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/styles.css?v=20261023">
 </head>
 <body>
@@ -40,16 +40,16 @@
 
 <div class="wrap">
 
-  <header class="top">
-    <div class="brand">
-      <span class="mark">IVN<b>_</b>05</span>
-      <span class="app"><svg class="ic"><use href="#i-swords"/></svg>Guerra de clanes</span>
-      <a class="btn back" href="/" aria-label="Volver al panel inicial">← Panel inicial</a>
-    </div>
+  <header class="top" id="top">
+    <a class="brand" href="/" aria-label="Guerra de clanes · inicio">
+      <span class="mark">IVN_05</span>
+      <span class="app">Guerra de clanes</span>
+    </a>
+    <div class="topfind" id="cwFind"></div>
     <div class="live" aria-live="polite"><span class="led" id="led"></span><span id="liveText">sin datos</span></div>
   </header>
 
-  <form class="query" id="query" autocomplete="off" role="search">
+  <form class="query" id="query" autocomplete="off" role="search" hidden>
     <label class="q" for="tag">Busca cualquier clan</label>
     <div class="qrow">
       <div class="qfield">
@@ -76,12 +76,28 @@
   </div>
 
   <div class="msg" id="msg" role="status" hidden></div>
-  <div class="chips" id="chips"></div>
-
+  
   <section class="intro" id="intro">
     <p class="lead">¿Cómo va tu clan en la guerra?</p>
     <p>Búscalo por su nombre o su tag y verás la carrera de barcos en directo, quién falta por jugar, a quién conviene expulsar y qué opciones tenéis de ganar el día y la semana.</p>
     <p><button type="button" class="link" data-demo="guerra">Probar con una demo</button><button type="button" class="link" data-demo="coliseo">Demo de semana de coliseo</button></p>
+  </section>
+
+  <section class="clanhero" id="hero" hidden aria-labelledby="heroName">
+    <div class="ch-top">
+      <div class="ch-id">
+        <span class="ch-kicker" id="heroKicker">Guerra de clanes</span>
+        <h1 id="heroName">—</h1>
+        <span class="ch-tag" id="heroTag"></span>
+      </div>
+      <details class="dl" id="pdfMenu" hidden>
+        <summary><svg class="ic"><use href="#i-download"/></svg>Informes PDF</summary>
+        <div class="dl-list" id="pdfList"><a class="dl-item pdf" id="pdfNow" href="api/report.pdf" target="_blank" rel="noopener" hidden><svg class="ic"><use href="#i-download"/></svg><span>Informe de hoy</span></a><a class="dl-item pdf" id="pdfDay" href="api/day.pdf" target="_blank" rel="noopener" hidden><svg class="ic"><use href="#i-download"/></svg><span>Día anterior</span></a><a class="dl-item pdf" id="pdfWeek" href="api/week.pdf" target="_blank" rel="noopener" hidden><svg class="ic"><use href="#i-download"/></svg><span>Última semana</span></a><a class="dl-item pdf" id="pdfCol" href="api/colosseum.pdf" target="_blank" rel="noopener" hidden><svg class="ic"><use href="#i-download"/></svg><span>Último coliseo</span></a></div>
+      </details>
+    </div>
+    <div class="chips" id="chips"></div>
+    <p class="sumtext" id="sumText"></p>
+    <div class="tiles" id="sumKpis"></div>
   </section>
 
   <nav class="tabs" id="tabs" role="tablist" hidden>
@@ -96,12 +112,7 @@
   <div id="panel-live" role="tabpanel" aria-labelledby="tab-live" hidden>
 
     <section class="fig" id="figNews" aria-labelledby="newsTitle" hidden>
-      <div class="fhead"><span class="fno">FIG. 00</span><h2 id="newsTitle">Novedades</h2>
-        <div class="aside"><a class="btn-pdf" id="pdfNow" href="api/report.pdf" target="_blank" rel="noopener" hidden>
-          <svg class="ic"><use href="#i-download"/></svg>Exportar PDF</a>
-          <a class="btn-pdf pdf" id="pdfDay" href="api/day.pdf" target="_blank" rel="noopener" hidden><svg class="ic"><use href="#i-download"/></svg><span>Día anterior</span></a>
-          <a class="btn-pdf pdf" id="pdfWeek" href="api/week.pdf" target="_blank" rel="noopener" hidden><svg class="ic"><use href="#i-download"/></svg><span>Semana</span></a>
-          <a class="btn-pdf pdf" id="pdfCol" href="api/colosseum.pdf" target="_blank" rel="noopener" hidden><svg class="ic"><use href="#i-download"/></svg><span>Coliseo</span></a></div></div>
+      <div class="fhead"><span class="fno">FIG. 00</span><h2 id="newsTitle">Novedades</h2></div>
       <div class="news-grid">
         <article class="news-card" id="newsReport" hidden>
           <h3><svg class="ic"><use href="#i-clock"/></svg>Informe de las <span id="reportHour">08:00</span></h3>
@@ -119,26 +130,10 @@
       </div>
     </section>
 
-    <section class="fig" aria-labelledby="sumTitle">
-      <div class="fhead"><span class="fno">FIG. 01</span><h2 id="sumTitle">La carrera</h2></div>
-      <p class="fsub" hidden id="riverSub"></p>
-      <p class="sumtext" id="sumText"></p>
-      <div class="river" id="river"></div>
-      <div class="legend rlegend" aria-hidden="true" id="riverLegend"></div>
-      <div class="tiles" id="sumKpis"></div>
-    </section>
-
-    <section class="fig" id="figPoints" aria-labelledby="ptsTitle">
-      <div class="fhead"><span class="fno">FIG. 02</span><h2 id="ptsTitle">Puntos de avance de hoy</h2></div>
-      <p class="fsub" hidden id="ptsSub">Lo que avanzará cada barco al cerrar el día: los puntos de su puesto por medallas más los de sus defensas en pie. Debajo de cada cifra, la probabilidad de quedar en ese puesto.</p>
-      <div class="tablewrap"><table class="ptable" id="ptsTable"></table></div>
-      <details class="howto"><summary>Supuestos del cálculo</summary><ul class="assume" id="ptsNotes"></ul></details>
-    </section>
-
     <section class="fig" aria-labelledby="raceTitle">
       <div class="fhead">
         <span class="fno">FIG. 03</span>
-        <h2 id="raceTitle">Medallas de hoy</h2>
+        <h2 id="raceTitle">La carrera</h2>
         <div class="aside">
           <div class="seg" id="viewSeg" hidden role="group" aria-label="Qué medallas comparar">
             <button type="button" data-view="day" aria-pressed="true">Hoy</button>
@@ -157,14 +152,13 @@
       <p class="note" id="raceNote" hidden></p>
     </section>
 
-    <section class="fig" aria-labelledby="dName">
+    <section class="fig drawer" id="figDetail" aria-labelledby="dName" hidden>
       <div class="fhead">
         <span class="fno">FIG. 04</span>
         <div class="dtitle"><span id="dShield"></span><h2 id="dName"></h2><span class="tag" id="dTag"></span><span class="chip green" id="dOwn" hidden>Tu clan</span></div>
         <div class="aside"><button type="button" class="btn" id="dSwitch" hidden><svg class="ic"><use href="#i-swap"/></svg>Analizar este clan</button></div>
       </div>
-      <p class="fsub" hidden>Detalle del clan que toques en la carrera.</p>
-      <div class="hero" id="dHero">
+            <div class="hero" id="dHero">
         <div class="big" id="dNow">0</div>
         <div class="cap"><strong id="dCapTitle">medallas hoy</strong><span id="dAvg"></span></div>
         <div class="side" id="dSide"></div>
@@ -182,7 +176,6 @@
       </div>
       <p class="fsub" hidden>Primero, quien más suele dejarse mazos según sus últimas semanas: son a los que conviene avisar.</p>
       <p class="psum" id="pSum"></p>
-      <div class="cardlegend" aria-hidden="true"><span><i class="pip used"></i>Mazo jugado</span><span><i class="pip"></i>Pendiente hoy</span></div>
       <ul class="plist" id="pList"></ul>
       <div class="legend" aria-hidden="true">
         <span><span class="pips"><i class="pip used"></i><i class="pip"></i></span>mazo jugado / pendiente</span>
@@ -195,6 +188,12 @@
 
   <!-- ================= JUGADORES ================= -->
   <div id="panel-players" role="tabpanel" aria-labelledby="tab-players" hidden>
+    <section class="fig" id="figMonth" aria-labelledby="monthTitle" hidden>
+      <div class="fhead"><span class="fno">MES</span><h2 id="monthTitle">Miembro del mes</h2></div>
+      <div class="mgrid" id="monthTop"></div>
+      <div class="tablewrap"><table class="mtable" id="monthTable"></table></div>
+      <p class="note" id="monthNote"></p>
+    </section>
     <section class="fig" aria-labelledby="plTitle">
       <div class="fhead"><span class="fno">FIG. 06</span><h2 id="plTitle">Compromiso de los jugadores</h2>
         <div class="aside"><a class="btn pdf" id="plPdf" href="api/players.pdf" target="_blank" rel="noopener" hidden><svg class="ic"><use href="#i-download"/></svg><span>Informe de jugadores (PDF)</span></a></div></div>
@@ -327,12 +326,12 @@
   </footer>
 </div>
 
+<script src="js/search.js?v=20261023"></script>
 <script src="js/config.js?v=20261023"></script>
 <script src="js/calc.js?v=20261023"></script>
 <script src="js/sim.js?v=20261023"></script>
 <script src="js/demo.js?v=20261023"></script>
 <script src="js/news.js?v=20261023"></script>
 <script src="js/app.js?v=20261023"></script>
-<p class="fanpolicy">Contenido de fans, no afiliado ni respaldado por Supercell. Datos de la API oficial de Clash Royale.</p>
 </body>
 </html>

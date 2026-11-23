@@ -718,6 +718,14 @@ const ACCESS_PAGE = `<!doctype html><html lang="es"><meta charset="utf-8"><meta 
 // Página para los miembros del clan: la tarjeta del dashboard a pantalla completa.
 // Se monta al vuelo desde deploy/dashboard-card.html, así siempre es la versión actual.
 // Página de un clan: la tarjeta a pantalla completa, con buscador de clan y aviso de contenido de fans
+// La web es una sola página: el monitor, para el clan de casa (/) o cualquier otro (/c/TAG)
+function monitorPage(tag) {
+  const html = fs.readFileSync(path.join(PUBLIC_DIR, 'index.html'), 'utf8')
+    .replace(/(\.(?:js|css))\?v=[0-9a-z]+/g, `$1?v=${getAssetVersion()}`)
+    .replace('<head>', `<head>\n<base href="/">\n<script>window.CW_TAG=${JSON.stringify(tag || '')};</script>`);
+  return html;
+}
+
 function clanPage(tag, home) {
   const card = fs.readFileSync(path.join(__dirname, 'deploy', 'dashboard-card.html'), 'utf8').replace(/^<!--[\s\S]*?-->\s*/, '');
   const search = CONFIG.anyClan ? `<div class="pick"><div id="cwFind" class="pick-s"></div>${CONFIG.clanTag && !home ? `<a href="/">← Volver a #${CONFIG.clanTag}</a>` : ''}</div><script src="/js/search.js?v=${getAssetVersion()}"></script><script>CWSearch.mount(document.getElementById("cwFind"))</script>` : '';
@@ -755,10 +763,14 @@ async function route(req, res) {
     if (p.startsWith('/api/')) return json(req, res, 401, { error: 'Acceso solo a través de Cloudflare Access.' });
     return send(res, 401, 'text/html; charset=utf-8', ACCESS_PAGE, { 'Cache-Control': 'no-store' });
   }
-  // Portada: la tarjeta. El monitor clásico, en /monitor (sus rutas son relativas, siguen valiendo)
-  if (p === '/monitor') return serveStatic(res, '/index.html');
-  if (p === '/monitor/') return send(res, 301, 'text/plain; charset=utf-8', '', { Location: '/monitor' });
-  if (p === '/' || p === '/clan' || p === '/clan/') return send(res, 200, 'text/html; charset=utf-8', clanPage(CONFIG.clanTag, true), { 'Cache-Control': 'no-store' });
+  // /monitor (y ?tag=) era la página «detallada»: ahora todo está en / y /c/TAG
+  if (p === '/monitor' || p === '/monitor/') {
+    const t = normalizeTag(url.searchParams.get('tag') || '');
+    const q = new URLSearchParams(url.searchParams); q.delete('tag');
+    const dest = (TAG_RE.test(t) && !isHome(t) ? `/c/${t}` : '/') + (q.toString() ? `?${q}` : '');
+    return send(res, 301, 'text/plain; charset=utf-8', '', { Location: dest });
+  }
+  if (p === '/' || p === '/clan' || p === '/clan/') return send(res, 200, 'text/html; charset=utf-8', monitorPage(CONFIG.clanTag), { 'Cache-Control': 'no-store' });
   // Página para instalar el marcador que trae el historial de guerra de RoyaleAPI
   if (p === '/marcador' || p === '/marcador/') {
     return send(res, 200, 'text/html; charset=utf-8', fs.readFileSync(path.join(__dirname, 'public', 'marcador.html')), { 'Cache-Control': 'no-store' });
@@ -774,7 +786,8 @@ async function route(req, res) {
   if (mc) {
     const t = normalizeTag(decodeURIComponent(mc[1]));
     if (!TAG_RE.test(t) || (CONFIG.clanTag && !CONFIG.anyClan && t !== CONFIG.clanTag)) return send(res, 302, 'text/plain', '', { Location: '/' });
-    return send(res, 200, 'text/html; charset=utf-8', clanPage(t, isHome(t)), { 'Cache-Control': 'no-store' });
+    if (isHome(t)) return send(res, 302, 'text/plain', '', { Location: '/' });
+    return send(res, 200, 'text/html; charset=utf-8', monitorPage(t), { 'Cache-Control': 'no-store' });
   }
   // Contadores de uso: solo desde la propia máquina (sin pasar por Cloudflare)
   if (p === '/api/stats') {

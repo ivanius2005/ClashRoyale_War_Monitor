@@ -110,7 +110,8 @@ h2{font:600 18px var(--sans);letter-spacing:-.015em}
 .tile:hover{transform:translateY(-2px);border-color:rgba(140,255,120,.22)}
 .cd{border-radius:14px;transition:transform .3s var(--ease)}
 .cd:hover{transform:translateY(-3px)}
-.ptabs{border-radius:999px}
+.ptabs{border-radius:999px;margin:26px 0 20px}
+#pSum,#pWar{margin-bottom:8px}
 .ptabs button[aria-selected="true"]{box-shadow:0 0 24px -6px rgba(57,255,20,.8)}
 .pdfbtn,.ra-btn{box-shadow:0 0 22px -6px rgba(57,255,20,.7)}
 .pick a{font-family:var(--mono)}
@@ -355,13 +356,7 @@ h2{font:600 18px var(--sans);letter-spacing:-.015em}
         d.known + ' de 10 semanas con datos</div></div>' +
         '<a class="pdfbtn" href="/api/player-war.pdf?tag=%23' + tag + '" target="_blank" rel="noopener">⤓ Historial en PDF</a></div>' + cmp + '</section>' +
       '<section class="card"><h2>Historial de guerra · últimas 10 semanas</h2>' + chart + '<div class="wscroll" style="margin-top:12px"><table class="wt"><thead><tr><th>Semana</th><th>Fecha</th><th style="text-align:right">Puesto</th><th>Clan</th><th style="text-align:right">Mazos</th><th style="text-align:right">Medallas</th><th style="text-align:right">Barco</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
-        (d.known < 10 ? '<p class="muted" style="margin:10px 0 0">«Sin datos»: la API oficial no da el historial de un jugador, solo el de cada clan. Se busca en su clan actual, en los clanes con los que aparece en sus batallas de guerra y en miles de clanes que la web revisa cada día. Para completarlo, usa el <a href="/marcador">botón de RoyaleAPI</a> en su página de RoyaleAPI.</p>' : '') + '</section>' +
-      '<section class="card ra"><h2 style="margin:0">Completar con RoyaleAPI</h2>' +
-        '<p class="muted" style="margin:0">Para semanas en clanes que el monitor no conoce (pequeños o de otros países).</p>' +
-        '<div class="ra-row"><a class="ra-btn" href="https://royaleapi.com/player/' + tag + '" target="_blank" rel="noopener">Abrir en RoyaleAPI ↗</a>' +
-        '<a href="/marcador">Usar el botón «→ Monitor de guerra» (también en el móvil)</a></div>' +
-        '<div class="ra-paste" id="raPaste" contenteditable="true" role="textbox" aria-label="Pega aquí la página de RoyaleAPI">En el ordenador: en RoyaleAPI pulsa «Load Clan Wars 2 History», luego Ctrl + A y Ctrl + C, y pega aquí (Ctrl + V).</div>' +
-        '<p class="ra-msg" id="raMsg" aria-live="polite"></p></section>' +
+        (d.known < 10 ? '<p class="muted" style="margin:10px 0 0">«Sin datos»: la API oficial no da el historial de un jugador, solo el de cada clan. Se busca en su clan actual, en los clanes con los que aparece en sus batallas de guerra y en miles de clanes que la web revisa cada día.</p>' : '') + '</section>' +
       (r ? '<p class="muted" style="text-align:center;margin:0">Requisitos de ' + esc(home.name || 'el clan') + ': apto desde ' + dec(r.watchUpTo, 1) + ', a revisar entre ' + dec(r.threshold, 1) + ' y ' + dec(r.watchUpTo, 1) + ', no apto por debajo; hacen falta ' + r.minWeeks + ' semanas con datos.</p>' : '');
   }
 

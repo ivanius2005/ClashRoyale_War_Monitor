@@ -419,37 +419,50 @@ function recruitCandidates(minScore, countryClans) {
   out.sort((a, b) => (a.stillThere - b.stillThere) || (b.score - a.score));
   return out;
 }
-function getRecruits({ country, minScore, minLevel, noClan }) {
-  const key = `recruit:${country}:${minScore}:${minLevel}:${noClan}`;
-  return cached(key, 20 * 60e3, async () => {
+// Lista ordenada de candidatos (barata: solo el índice). Se calcula una vez cada 20 minutos.
+function recruitList(country, minScore) {
+  return cached(`recruit:list:${country}:${minScore}`, 20 * 60e3, async () => {
     const home = await homeCountry();
     const countryClans = country === 'home' && home.clans.length ? new Set(home.clans) : null;
-    const cands = recruitCandidates(minScore, countryClans);
+    // Margen: el índice puede ir algo atrasado respecto a la ficha; la nota definitiva es la de la ficha
+    return { home, countryClans: countryClans ? countryClans.size : 0, cands: recruitCandidates(minScore - 1, countryClans) };
+  });
+}
+// Una página de 10: se comprueba el perfil (sin clan) y se calcula la nota con la misma ficha que /p/TAG,
+// así la nota de la lista y la del perfil son siempre la misma.
+const RECRUIT_PAGE = 10;
+function getRecruits({ country, minScore, noClan, offset }) {
+  return cached(`recruit:${country}:${minScore}:${noClan}:${offset}`, 20 * 60e3, async () => {
+    const { home, countryClans, cands } = await recruitList(country, minScore);
     const found = [];
-    let checked = 0;
-    const MAX_CHECK = 160, WANT = 30;
-    for (let i = 0; i < cands.length && checked < MAX_CHECK && found.length < WANT; i += 4) {
-      const batch = cands.slice(i, i + 4);
-      checked += batch.length;
-      const profiles = await Promise.all(batch.map((c) => playerBasic(normalizeTag(c.tag)).catch(() => null)));
-      batch.forEach((c, j) => {
-        const p = profiles[j];
-        if (!p) return;
-        if (noClan && p.clan) return;
-        if (p.clan && p.clan.tag === `#${CONFIG.clanTag}`) return; // ya está en el clan
-        if ((p.expLevel || 0) < minLevel) return;
-        found.push(Object.assign(c, {
-          name: p.name, expLevel: p.expLevel, trophies: p.trophies, bestTrophies: p.bestTrophies,
-          arena: p.arena ? p.arena.name : null, clan: p.clan ? { tag: p.clan.tag, name: p.clan.name } : null,
-          warDayWins: p.warDayWins || 0,
-        }));
-      });
+    let i = offset, checked = 0;
+    while (i < cands.length && found.length < RECRUIT_PAGE && checked < 240) {
+      const batch = cands.slice(i, i + Math.min(6, RECRUIT_PAGE - found.length));
+      i += batch.length; checked += batch.length;
+      const res = await Promise.all(batch.map(async (c) => {
+        const bare = normalizeTag(c.tag);
+        const p = await playerBasic(bare).catch(() => null);
+        if (!p) return null;
+        if (noClan && p.clan) return null;
+        if (p.clan && p.clan.tag === `#${CONFIG.clanTag}`) return null; // ya está en el clan
+        const war = await getPlayerWar(bare).catch(() => null);
+        const e = war && war.evaluation;
+        if (!e || e.score == null || e.verdict === 'nuevo' || e.score < minScore) return null;
+        const lastKnown = (war.weeks || []).find((w) => w.known) || null;
+        return {
+          tag: p.tag, name: p.name, expLevel: p.expLevel, trophies: p.trophies, arena: p.arena ? p.arena.name : null,
+          clan: p.clan ? { tag: p.clan.tag, name: p.clan.name } : null,
+          score: e.score, medalScore: e.medalScore, deckScore: e.deckScore, medalsPerWeek: e.medalsPerWeek, decks160: e.decks160,
+          weeks: e.weeks, apt: e.apt, lastClan: lastKnown && lastKnown.clan ? lastKnown.clan : c.lastClan,
+        };
+      }));
+      res.forEach((r) => { if (r) found.push(r); });
     }
-    found.sort((a, b) => b.score - a.score);
     return {
-      fetchedAt: new Date().toISOString(), country: country === 'home' ? (home.name || null) : null, countryCode: country === 'home' ? (home.code || null) : null,
-      countryClans: countryClans ? countryClans.size : 0, candidates: cands.length, checked, indexedPlayers: Object.keys(warIndex.players).length,
-      players: found,
+      fetchedAt: new Date().toISOString(), country: country === 'home' ? (home.name || null) : null,
+      countryCode: country === 'home' ? (home.code || null) : null, countryClans,
+      candidates: cands.length, offset, nextOffset: i, more: i < cands.length, checked,
+      indexedPlayers: Object.keys(warIndex.players).length, players: found,
     };
   });
 }
@@ -926,8 +939,8 @@ async function route(req, res) {
     const opts = {
       country: q.get('country') === 'any' ? 'any' : 'home',
       minScore: Math.round(num(q.get('min'), -2, 4, 1) * 4) / 4,
-      minLevel: Math.round(num(q.get('level'), 1, 80, 1)),
       noClan: q.get('noclan') !== '0',
+      offset: Math.round(num(q.get('offset'), 0, 200000, 0)),
     };
     return json(req, res, 200, await getRecruits(opts));
   }

@@ -114,25 +114,6 @@
   <!-- ================= HOY EN DIRECTO ================= -->
   <div id="panel-live" role="tabpanel" aria-labelledby="tab-live" hidden>
 
-    <section class="fig" id="figNews" aria-labelledby="newsTitle" hidden>
-      <div class="fhead"><span class="fno">FIG. 00</span><h2 id="newsTitle">Novedades</h2></div>
-      <div class="news-grid">
-        <article class="news-card" id="newsReport" hidden>
-          <h3><svg class="ic"><use href="#i-clock"/></svg>Informe de las <span id="reportHour">08:00</span></h3>
-          <p class="news-sub" id="reportWhen"></p>
-          <table class="cmp" id="reportCmp"></table>
-          <p class="news-label" id="reportChangesLabel" hidden>Desde el informe anterior</p>
-          <ul class="changes" id="reportChanges"></ul>
-          <a class="news-pdf" id="reportPdf" href="api/report/latest.pdf" target="_blank" rel="noopener" hidden>PDF de este informe →</a>
-        </article>
-        <article class="news-card" id="newsSeen">
-          <h3><svg class="ic"><use href="#i-refresh"/></svg>Desde tu última visita</h3>
-          <p class="news-sub" id="seenWhen"></p>
-          <ul class="changes" id="seenChanges"></ul>
-        </article>
-      </div>
-    </section>
-
     <section class="fig" aria-labelledby="raceTitle">
       <div class="fhead">
         <span class="fno">FIG. 03</span>
@@ -198,7 +179,7 @@
     </section>
     <section class="fig" aria-labelledby="plTitle">
       <div class="fhead"><span class="fno">FIG. 06</span><h2 id="plTitle">Compromiso de los jugadores</h2>
-        <div class="aside"><a class="btn pdf" id="plPdf" href="api/players.pdf" target="_blank" rel="noopener" hidden><svg class="ic"><use href="#i-download"/></svg><span>Informe de jugadores (PDF)</span></a></div></div>
+</div>
       <p class="fsub" hidden id="plSub">Cómo ha jugado cada miembro en las últimas semanas de guerra. Cada semana tiene 16 mazos: 4 al día durante 4 días.</p>
       <div class="pctl">
         <label for="plClan" class="csub">Clan</label>
@@ -256,11 +237,6 @@
           <input class="slide" type="range" id="rMin" min="-0.5" max="3" step="0.25" value="1" aria-label="Nota mínima">
           <div class="kc-scale"><span>−0,5</span><span>+3</span></div>
         </div>
-        <div class="kc">
-          <div class="kc-top"><span class="kc-k">Nivel mínimo</span><output class="kc-v" id="rLevelOut" for="rLevel">40</output></div>
-          <input class="slide" type="range" id="rLevel" min="1" max="70" step="1" value="40" aria-label="Nivel mínimo">
-          <div class="kc-scale"><span>1</span><span>70</span></div>
-        </div>
         <div class="kc kc-goal">
           <label class="kc-switch"><input type="checkbox" id="rNoClan" checked><span class="sw-ui" aria-hidden="true"></span><span class="kc-k">Solo jugadores sin clan</span></label>
           <button class="go" id="rRun" type="submit"><svg class="ic"><use href="#i-search"/></svg>Buscar</button>
@@ -268,6 +244,7 @@
       </form>
       <p class="simstate" id="rState"></p>
       <div class="rlist" id="rList"></div>
+      <div class="rmore"><button type="button" class="go ghost" id="rMore" hidden><svg class="ic"><use href="#i-refresh"/></svg>Cargar 10 más</button></div>
     </section>
   </div>
 
@@ -277,7 +254,6 @@
       <div class="fhead"><span class="fno">FIG. 08</span><h2 id="simTitle">Simulador de la semana</h2></div>
       <p class="fsub" hidden>Jugamos la semana miles de veces con el historial de cada clan y contamos cuántas veces acaba cada uno en cada puesto.</p>
       <form class="simctl" id="simForm">
-        <p class="simfixed"><b>3.000.000</b> simulaciones · variabilidad diaria <b>3,2 %</b> (la real de Furia Ibérica en sus 10 últimas semanas) · las semanas recientes pesan más (1 · 0,9 … 0,1)</p>
         <label id="simTypeBox">Tipo de semana
           <select id="simType">
             <option value="auto">Carrera normal</option>
@@ -287,7 +263,7 @@
         <button class="go" id="simRun" type="submit"><svg class="ic"><use href="#i-dice"/></svg>Simular</button>
       </form>
       <div class="simprog" id="simProg" role="progressbar" aria-label="Progreso de la simulación" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" hidden><div class="bar"><i id="simProgBar"></i></div><span id="simProgTxt">Simulando… 0 %</span></div>
-      <p class="simstate" id="simState"></p>
+      <p class="simstate" id="simState" hidden></p>
       <div class="msg" id="simMsg" role="status" hidden></div>
 
       <div class="simout" id="simOut" hidden>

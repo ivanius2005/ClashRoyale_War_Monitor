@@ -415,6 +415,9 @@ function renderRace() {
 
   $('ticks').innerHTML = m.training ? '' : [0, 0.25, 0.5, 0.75, 1].map((f) => `<span style="left:${f * 100}%">${fmt(top * f)}</span>`).join('');
 
+  // El detalle se coloca dentro de la lista, bajo la fila tocada: hay que sacarlo antes de redibujarla
+  const fig = $('figDetail');
+  if (fig && $('race').contains(fig)) $('race').closest('section').after(fig);
   $('race').innerHTML = clans.map((c, i) => {
     const v = viewVals(c, key);
     const t = today(c);
@@ -553,7 +556,6 @@ function renderPending() {
  * JUGADORES
  * ========================================================= */
 function renderPlayers() {
-  setPdfButton($('plPdf'), `api/players.pdf?${kickQuery()}`);
   const m = state.model;
   if (!state.plClan || !m.clans.some((c) => c.tag === state.plClan)) state.plClan = state.selected || m.own;
   $('plClan').innerHTML = m.clans.map((c) => `<option value="${esc(c.tag)}"${c.tag === state.plClan ? ' selected' : ''}>${esc(c.name)}${c.tag === m.own ? ' (tu clan)' : ''}</option>`).join('');
@@ -1105,7 +1107,6 @@ function schedule() {
 }
 
 function runDemo(kind, seed, name) {
-  $('figNews').hidden = true;
   state.demo = kind;
   state.demoSeed = seed == null ? null : seed;
   state.demoName = name || null;
@@ -1303,78 +1304,90 @@ function saveSeen(tag, full) {
 /* =========================================================
  * RECLUTAMIENTO
  * ========================================================= */
-const recruit = { busy: false, data: null, key: null };
+const recruit = { busy: false, data: null, key: null, players: [], countryName: null };
 function recruitQuery() {
   return new URLSearchParams({
-    country: $('rCountry').value === 'any' ? 'any' : 'home', min: $('rMin').value, level: $('rLevel').value, noclan: $('rNoClan').checked ? '1' : '0',
+    country: $('rCountry').value === 'any' ? 'any' : 'home', min: $('rMin').value, noclan: $('rNoClan').checked ? '1' : '0',
   }).toString();
 }
 function recruitControls() {
   $('rMinOut').textContent = sdec(Number($('rMin').value), Number($('rMin').value) % 0.5 ? 2 : 1);
-  $('rLevelOut').textContent = $('rLevel').value;
-  paintSlider($('rMin')); paintSlider($('rLevel'));
+  paintSlider($('rMin'));
 }
 function openRecruit() {
   recruitControls();
-  if (state.demo || !state.conf) { $('rState').textContent = 'El reclutamiento solo está en la web de la Raspberry (necesita la API en directo).'; $('rForm').hidden = true; return; }
+  if (state.demo || !state.conf) { $('rState').textContent = 'El reclutamiento solo está en la web de la Raspberry (necesita la API en directo).'; $('rForm').hidden = true; $('rMore').hidden = true; return; }
   if (!isHomeClan()) {
-    $('rForm').hidden = true; $('rCopy').hidden = true; $('rList').innerHTML = '';
-    $('rState').textContent = `Por ahora el reclutamiento solo está disponible para ${state.conf && state.conf.homeName ? state.conf.homeName : 'Furia Ibérica'}.`;
+    $('rForm').hidden = true; $('rCopy').hidden = true; $('rList').innerHTML = ''; $('rMore').hidden = true;
+    $('rState').textContent = 'Por ahora el reclutamiento solo está disponible para Furia Ibérica.';
     return;
   }
   $('rForm').hidden = false; $('rCopy').hidden = false;
-  if (!recruit.data || recruit.key !== recruitQuery()) runRecruit();
+  if (!recruit.data || recruit.key !== recruitQuery()) runRecruit(false);
 }
-async function runRecruit() {
+// more = false: búsqueda nueva (10 primeros); true: los 10 siguientes
+async function runRecruit(more) {
   if (recruit.busy) return;
   const key = recruitQuery();
-  recruit.busy = true; $('rRun').disabled = true;
-  $('rState').textContent = 'Buscando jugadores… revisa miles de jugadores del índice de guerra y comprueba sus perfiles (puede tardar unos segundos).';
-  $('rList').innerHTML = '<div class="rskel"></div><div class="rskel"></div><div class="rskel"></div>';
+  if (!more || recruit.key !== key) { recruit.players = []; recruit.data = null; }
+  const offset = more && recruit.data ? recruit.data.nextOffset : 0;
+  recruit.busy = true; $('rRun').disabled = true; $('rMore').disabled = true;
+  $('rState').textContent = more ? 'Buscando 10 más…' : 'Buscando jugadores… se comprueba el perfil y el historial de cada uno (puede tardar unos segundos).';
+  if (!more) $('rList').innerHTML = '<div class="rskel"></div><div class="rskel"></div><div class="rskel"></div>';
+  else $('rList').insertAdjacentHTML('beforeend', '<div class="rskel" data-tmp></div><div class="rskel" data-tmp></div>');
   try {
-    const d = await getJson(`api/recruit?${key}`);
+    const d = await getJson(`api/recruit?${key}&offset=${offset}`);
     recruit.data = d; recruit.key = key;
-    renderRecruit(d);
+    recruit.players = recruit.players.concat(d.players);
+    renderRecruit(d, more);
   } catch (e) {
     $('rState').textContent = `No se pudo buscar: ${e.message}`;
-    $('rList').innerHTML = '';
+    $('rList').querySelectorAll('[data-tmp]').forEach((x) => x.remove());
+    if (!more) $('rList').innerHTML = '';
   } finally {
-    recruit.busy = false; $('rRun').disabled = false;
+    recruit.busy = false; $('rRun').disabled = false; $('rMore').disabled = false;
   }
 }
-function renderRecruit(d) {
+function recruitCard(p, i) {
+  const bare = String(p.tag).replace('#', '');
+  const game = `https://link.clashroyale.com/es/?playerInfo?id=${encodeURIComponent(bare)}`;
+  const meta = [`<span class="rtag">${esc(p.tag)}</span>`, p.trophies != null ? `${fmt(p.trophies)} copas` : '', p.lastClan && p.lastClan.name ? `último clan: ${esc(p.lastClan.name)}` : '', p.clan ? `ahora en ${esc(p.clan.name)}` : 'sin clan']
+    .filter(Boolean).join(' · ');
+  return `<div class="rcard" style="--i:${i % 10}">
+    <span class="rlv" title="Nivel de rey">${p.expLevel || '—'}</span>
+    <div class="rwho"><a class="rname" href="/p/${esc(bare)}">${esc(p.name || p.tag)}</a><span class="rmeta">${meta}</span></div>
+    <div class="rstat" title="Medallas ${sdec(p.medalScore)} + mazos ${sdec(p.deckScore)} · ${p.weeks} semanas con datos"><b>${sdec(p.score)}</b>${fmt(p.medalsPerWeek)} med./sem. · ${Math.round(p.decks160)}/160</div>
+    <div class="racts">
+      <a class="rbtn" href="/p/${esc(bare)}"><svg class="ic"><use href="#i-users"/></svg>Perfil</a>
+      <a class="rbtn game" href="${esc(game)}" target="_blank" rel="noopener"><svg class="ic"><use href="#i-link"/></svg>Abrir en el juego</a>
+    </div>
+  </div>`;
+}
+function renderRecruit(d, more) {
   if (d.countryCode || d.country) {
     let name = d.country;
     try { if (d.countryCode) name = new Intl.DisplayNames(['es'], { type: 'region' }).of(d.countryCode) || name; } catch {}
     $('rCountry').options[0].textContent = name;
     recruit.countryName = name;
   }
-  const when = new Date(d.fetchedAt).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
-  $('rState').textContent = d.players.length
-    ? `${d.players.length} ${d.players.length === 1 ? 'jugador cumple' : 'jugadores cumplen'} los criterios (${fmt(d.candidates)} candidatos con buena nota entre ${fmt(d.indexedPlayers)} jugadores del índice; ${d.checked} perfiles comprobados a las ${when}).`
-    : `Nadie cumple ahora mismo los criterios (${fmt(d.candidates)} candidatos con buena nota; ${d.checked} perfiles comprobados a las ${when}). Prueba a bajar la nota o el nivel.`;
-  $('rList').innerHTML = d.players.map((p, i) => {
-    const bare = String(p.tag).replace('#', '');
-    const game = `https://link.clashroyale.com/es/?playerInfo?id=${encodeURIComponent(bare)}`;
-    const meta = [`<span class="rtag">${esc(p.tag)}</span>`, p.trophies != null ? `${fmt(p.trophies)} copas` : '', p.lastClan && p.lastClan.name ? `último clan: ${esc(p.lastClan.name)}` : '', p.clan ? `ahora en ${esc(p.clan.name)}` : 'sin clan']
-      .filter(Boolean).join(' · ');
-    return `<div class="rcard" style="--i:${i}">
-      <span class="rlv" title="Nivel de rey">${p.expLevel || '—'}</span>
-      <div class="rwho"><a class="rname" href="/p/${esc(bare)}">${esc(p.name || p.tag)}</a><span class="rmeta">${meta}</span></div>
-      <div class="rstat" title="Medallas ${sdec(p.medalScore)} + mazos ${sdec(p.deckScore)} · ${p.weeks} semanas con datos"><b>${sdec(p.score)}</b>${fmt(p.medalsPerWeek)} med./sem. · ${Math.round(p.decks160)}/160</div>
-      <div class="racts">
-        <a class="rbtn" href="/p/${esc(bare)}"><svg class="ic"><use href="#i-users"/></svg>Perfil</a>
-        <a class="rbtn game" href="${esc(game)}" target="_blank" rel="noopener"><svg class="ic"><use href="#i-link"/></svg>Abrir en el juego</a>
-      </div>
-    </div>`;
-  }).join('');
+  const n = recruit.players.length;
+  $('rState').textContent = n
+    ? `${n} ${n === 1 ? 'jugador cumple' : 'jugadores cumplen'} los criterios${d.more ? '' : ' (no hay más)'}.`
+    : d.more ? 'Ninguno de los primeros revisados cumple los criterios: pulsa «Cargar 10 más» para seguir buscando.'
+      : 'Nadie cumple ahora mismo los criterios. Prueba a bajar la nota.';
+  $('rList').querySelectorAll('[data-tmp]').forEach((x) => x.remove());
+  if (more) $('rList').insertAdjacentHTML('beforeend', d.players.map((p, i) => recruitCard(p, i)).join(''));
+  else $('rList').innerHTML = d.players.map((p, i) => recruitCard(p, i)).join('');
+  $('rMore').hidden = !d.more;
 }
-$('rForm').addEventListener('submit', (e) => { e.preventDefault(); recruit.data = null; runRecruit(); });
-['rMin', 'rLevel'].forEach((id) => $(id).addEventListener('input', recruitControls));
+$('rForm').addEventListener('submit', (e) => { e.preventDefault(); runRecruit(false); });
+$('rMore').addEventListener('click', () => runRecruit(true));
+$('rMin').addEventListener('input', recruitControls);
 $('rCopy').addEventListener('click', async () => {
-  const d = recruit.data;
-  if (!d || !d.players.length) return;
-  const text = `Jugadores para reclutar (${d.countryCode ? (recruit.countryName || d.country) : 'cualquier país'}):\n` + d.players.map((p) => `- ${p.name} ${p.tag}: nota ${sdec(p.score)}, ${fmt(p.medalsPerWeek)} medallas/sem., nivel ${p.expLevel} · https://link.clashroyale.com/es/?playerInfo?id=${String(p.tag).replace('#', '')}`).join('\n');
+  const list = recruit.players;
+  if (!list.length) return;
+  const d = recruit.data || {};
+  const text = `Jugadores para reclutar (${d.countryCode ? (recruit.countryName || d.country) : 'cualquier país'}):\n` + list.map((p) => `- ${p.name} ${p.tag}: nota ${sdec(p.score)}, ${fmt(p.medalsPerWeek)} medallas/sem. · https://link.clashroyale.com/es/?playerInfo?id=${String(p.tag).replace('#', '')}`).join('\n');
   const label = $('rCopy').querySelector('span');
   try { await navigator.clipboard.writeText(text); label.textContent = '¡Copiada!'; } catch { label.textContent = 'No se pudo copiar'; }
   setTimeout(() => { label.textContent = 'Copiar la lista'; }, 1800);
@@ -1451,83 +1464,27 @@ function renderRanking(r) {
 }
 
 async function loadNews(tag) {
-  if (state.demo || !state.conf) { $('figNews').hidden = true; return; }
+  if (state.demo || !state.conf) return;
   try {
     const sum = await getJson(`api/summary?tag=${encodeURIComponent(tag)}`);
     if (state.tag !== tag) return;
     fixBaseline(tag);
     state.summary = sum;
-    if (!isHomeClan()) state.report = null; // el informe de las 08:00 es solo del clan de casa
-    else if (state.conf.reports && Date.now() - state.reportFetchedAt > 5 * 60 * 1000) {
-      state.reportFetchedAt = Date.now();
-      try { state.report = await getJson('api/report/latest'); } catch { state.report = null; }
-    }
     renderNews();
     renderMonth(sum);
     saveSeen(tag, sum);
-  } catch {
-    $('figNews').hidden = !state.summary; // si ya había datos, se dejan los últimos
-  }
+  } catch { /* sin resumen: se queda lo último */ }
 }
 
-function changeItems(list, emptyText) {
-  if (!list.length) return `<li class="empty"><span class="arr">·</span>${esc(emptyText)}</li>`;
-  return list.map((c) => {
-    const arr = c.dir === 'up' ? '▲' : c.dir === 'down' ? '▼' : '•';
-    const tone = c.good === true ? 'n-good' : c.good === false ? 'n-bad' : '';
-    return `<li class="${tone}${c.own ? '' : ' rival'}"><span class="arr" aria-hidden="true">${arr}</span><span>${esc(c.text)}</span></li>`;
-  }).join('');
-}
-
+// Menú de informes PDF (las «Novedades» ya no se muestran)
 function renderNews() {
-  const sum = state.summary;
-  $('figNews').hidden = !sum;
-  if (!sum) return;
+  if (!state.summary) return;
   $('pdfNow').hidden = !(state.conf && state.conf.pdf && isHomeClan());
   // Análisis en PDF: activos para el clan de casa, «bloqueados» para los demás
   setPdfButton($('pdfDay'), 'api/day.pdf');
   setPdfButton($('pdfWeek'), 'api/week.pdf');
   setPdfButton($('pdfCol'), 'api/colosseum.pdf');
   syncPdfMenu();
-
-  // Desde tu última visita
-  if (!state.prevSeen) {
-    $('seenWhen').textContent = 'Primera visita desde este dispositivo.';
-    $('seenChanges').innerHTML = changeItems([], 'La próxima vez que entres verás aquí lo que haya cambiado: puesto, opciones de ganar, mazos jugados…');
-  } else {
-    $('seenWhen').textContent = `Tu última visita fue ${ago(Date.now() - state.prevSeenAt)}.`;
-    $('seenChanges').innerHTML = changeItems(News.diff(state.prevSeen, sum), 'Nada importante ha cambiado desde entonces.');
-  }
-
-  // Informe de las 08:00 (solo si es de esta misma carrera)
-  const r = state.report;
-  const show = !!(r && r.summary && News.sameRace(r.summary, sum));
-  $('newsReport').hidden = !show;
-  if (!show) return;
-  const d = new Date(r.generatedAt);
-  const hh = d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', timeZone: r.tz || undefined });
-  $('reportHour').textContent = hh;
-  $('reportWhen').textContent = `${DAYS_ES[d.getDay()]} ${d.getDate()} de ${MONTHS_ES[d.getMonth()]} · ${r.summary.race.label.toLowerCase()}`;
-  const ownAt = r.summary.clans.find((c) => c.own), ownNow = sum.clans.find((c) => c.own);
-  const rows = [];
-  const cell = (a, b, better) => `<td>${esc(a)}</td><td class="now ${better == null ? '' : better ? 'better' : 'worse'}">${esc(b)}</td>`;
-  if (ownAt && ownNow) {
-    rows.push(`<tr><td>Puesto</td>${cell(`${ownAt.position}º`, `${ownNow.position}º`, ownNow.position === ownAt.position ? null : ownNow.position < ownAt.position)}</tr>`);
-    if (ownAt.week && ownNow.week) {
-      const dp = ownNow.week.pFirst - ownAt.week.pFirst;
-      rows.push(`<tr><td>Opciones de terminar 1º</td>${cell(News.pct(ownAt.week.pFirst), News.pct(ownNow.week.pFirst), Math.abs(dp) < 0.03 ? null : dp > 0)}</tr>`);
-    }
-    if (!sum.race.colosseum) rows.push(`<tr><td>Avance</td>${cell(News.fmt(ownAt.progress), News.fmt(ownNow.progress), null)}</tr>`);
-  }
-  if (r.summary.own && sum.own) {
-    const sameDay = r.summary.race.battleDay === sum.race.battleDay;
-    rows.push(`<tr><td>Mazos pendientes ${sameDay ? 'hoy' : '(ese día)'}</td>${cell(String(r.summary.own.decksLeft), sameDay ? String(sum.own.decksLeft) : '—', sameDay ? sum.own.decksLeft <= r.summary.own.decksLeft : null)}</tr>`);
-  }
-  $('reportCmp').innerHTML = `<thead><tr><th></th><th>${esc(hh)}</th><th>Ahora</th></tr></thead><tbody>${rows.join('')}</tbody>`;
-  $('reportPdf').hidden = !r.pdf;
-  const ch = r.changes || [];
-  $('reportChangesLabel').hidden = !ch.length;
-  $('reportChanges').innerHTML = ch.length ? changeItems(ch, '') : '';
 }
 
 async function boot() {

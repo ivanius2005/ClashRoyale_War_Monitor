@@ -350,7 +350,7 @@ h2{font:600 18px var(--sans);letter-spacing:-.015em}
     $('pWar').innerHTML =
       '<section class="card"><div class="wtop"><div><div class="k">Evaluación para ' + esc(home.name || 'el clan') + '</div>' +
         '<div class="verdict ' + cls + '">' + esc(e.apt || 'Sin datos suficientes') + '</div>' +
-        '<div class="sub">' + (e.score != null ? 'Nota <b>' + dec(e.score, 2) + '</b> · ' : '') +
+        '<div class="sub">' + (e.score != null ? 'Nota <b>' + dec(e.score, 2) + '</b> (medallas ' + dec(e.medalScore, 2) + ' + mazos ' + dec(e.deckScore, 2) + ' · ' + fmt(Math.round(e.medalsPerWeek)) + ' medallas/sem. · ' + Math.round(e.decks160) + '/160 mazos) · ' : '') +
         (e.reliability && e.reliability.index != null ? 'Fiabilidad <b class="' + ({ Alta: 'good', Media: 'warn', Baja: 'bad' }[e.reliability.label] || '') + '">' + e.reliability.index + ' · ' + esc(e.reliability.label) + '</b> · ' : '') +
         d.known + ' de 10 semanas con datos</div></div>' +
         '<a class="pdfbtn" href="/api/player-war.pdf?tag=%23' + tag + '" target="_blank" rel="noopener">⤓ Historial en PDF</a></div>' + cmp + '</section>' +
@@ -362,7 +362,10 @@ h2{font:600 18px var(--sans);letter-spacing:-.015em}
         '<a href="/marcador">Usar el botón «→ Monitor de guerra» (también en el móvil)</a></div>' +
         '<div class="ra-paste" id="raPaste" contenteditable="true" role="textbox" aria-label="Pega aquí la página de RoyaleAPI">En el ordenador: en RoyaleAPI pulsa «Load Clan Wars 2 History», luego Ctrl + A y Ctrl + C, y pega aquí (Ctrl + V).</div>' +
         '<p class="ra-msg" id="raMsg" aria-live="polite"></p></section>' +
-      (r ? '<p class="muted" style="text-align:center;margin:0">Requisitos de ' + esc(home.name || 'el clan') + ' (por defecto): apto por encima de ' + dec(r.watchUpTo, 1) + ', a revisar entre ' + dec(r.threshold, 1) + ' y ' + dec(r.watchUpTo, 1) + ', no apto por debajo; objetivo ' + fmt(r.medalTarget) + ' medallas por semana; hacen falta ' + r.minWeeks + ' semanas.</p>' : '');
+      (r ? '<p class="muted" style="text-align:center;margin:0">Requisitos de ' + esc(home.name || 'el clan') + ' (por defecto), con las 10 últimas semanas: nota = medallas + mazos. ' +
+        'Medallas por semana: más de 2.400 → +1 y +0,1 por cada 100 más; 2.400 → +0,75; 2.200-2.399 → 0; menos de 2.200 → −0,25 y −0,25 por cada 100 menos. ' +
+        'Mazos sobre 160: 156 o más → +2; 148-155 → +0,5; menos de 148 → −0,2 por cada mazo que falte hasta 148. ' +
+        'Apto desde ' + dec(r.watchUpTo, 1) + ', a revisar entre ' + dec(r.threshold, 1) + ' y ' + dec(r.watchUpTo, 1) + ', no apto por debajo; hacen falta ' + r.minWeeks + ' semanas con datos.</p>' : '');
   }
 
   // ---------- Pegar la página de RoyaleAPI: se lee la tabla del historial (con los enlaces a los clanes si vienen) ----------

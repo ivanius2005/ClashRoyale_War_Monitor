@@ -35,11 +35,9 @@ test('tendencia: últimas 4 semanas frente a las 6 anteriores', () => {
 });
 
 test('ajustes de expulsión desde la URL', () => {
-  const o = parseKickOpts(new URLSearchParams('weeks=6&medal=2&thr=0.5&coef=-1,-3,-2,0.5,1'));
-  assert.deepEqual(o, { weeks: 6, medalWeight: 2, medalTarget: 2400, threshold: 0.5, coef: [-1, -3, -2, 0.5, 1] });
-  assert.equal(parseKickOpts(new URLSearchParams('weeks=99&coef=x')).weeks, 10);
-  assert.deepEqual(parseKickOpts(new URLSearchParams('')), { weeks: 10, medalWeight: 1, medalTarget: 2400, threshold: -0.5, coef: [-0.5, -1, -0.75, -0.25, 0.5] });
-  assert.equal(parseKickOpts(new URLSearchParams('target=2400')).medalTarget, 2400);
+  assert.deepEqual(parseKickOpts(new URLSearchParams('weeks=6&thr=0.5')), { weeks: 6, threshold: 0.5 });
+  assert.equal(parseKickOpts(new URLSearchParams('weeks=99')).weeks, 10);
+  assert.deepEqual(parseKickOpts(new URLSearchParams('')), { weeks: 10, threshold: -0.5 });
 });
 
 test('informe de jugadores: series, medias, tendencias y expulsiones', () => {

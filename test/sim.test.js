@@ -245,20 +245,46 @@ test('expulsión: reparto de la semana en días completos', () => {
   assert.deepEqual(CWSim.splitWeek(6, 3), [4, 2, 0]);
 });
 
-test('expulsión: coeficientes por día, medallas y veredictos', () => {
-  // 4 semanas iguales (16 mazos = los 4 días completos)
+test('expulsión: puntos de medallas por semana', () => {
+  const near = (a, b) => assert.ok(Math.abs(a - b) < 1e-9, `${a} ≠ ${b}`);
+  near(CWSim.medalPoints(2500), 1.1);
+  near(CWSim.medalPoints(2600), 1.2);
+  near(CWSim.medalPoints(2650), 1.25);
+  near(CWSim.medalPoints(2401), 1.001);
+  near(CWSim.medalPoints(2400), 0.75);
+  near(CWSim.medalPoints(2399), 0);
+  near(CWSim.medalPoints(2200), 0);
+  near(CWSim.medalPoints(2100), -0.5);
+  near(CWSim.medalPoints(2000), -0.75);
+  near(CWSim.medalPoints(2150), -0.375);
+});
+
+test('expulsión: puntos de mazos sobre 160', () => {
+  const near = (a, b) => assert.ok(Math.abs(a - b) < 1e-9, `${a} ≠ ${b}`);
+  near(CWSim.deckPoints(160), 2);
+  near(CWSim.deckPoints(156), 2);
+  near(CWSim.deckPoints(155), 0.5);
+  near(CWSim.deckPoints(148), 0.5);
+  near(CWSim.deckPoints(147), -0.2);
+  near(CWSim.deckPoints(140), -1.6);
+});
+
+test('expulsión: nota, veredictos y escala a 160 con menos semanas', () => {
+  // 4 semanas iguales: 160 equivale a 16 mazos por semana
   const mk = (rows) => CWSim.prepareHistory([1, 2, 3, 4].map((i) => ({ medals: 1, createdDate: `2026090${i}T095000.000Z`, players: rows })));
-  const w = mk([['#a', 16, 2600], ['#b', 0, 0], ['#c', 16, 2000], ['#d', 12, 2400]]);
+  const w = mk([['#a', 16, 2600], ['#b', 0, 0], ['#c', 15, 2300], ['#d', 14, 2100]]);
   const m = ['a', 'b', 'c', 'd'].map((x) => ({ tag: `#${x}`, name: x }));
-  const by = Object.fromEntries(CWSim.kickReport(w, m, { medalTarget: 2500 }).rows.map((r) => [r.name, r]));
-  // a: todos los mazos (+0,5) y 2.600 medallas (+0,6) → 1,1 → bien
-  assert.ok(Math.abs(by.a.score - 1.1) < 1e-9); assert.equal(by.a.verdict, 'bien');
-  // c: todos los mazos (+0,5) y 2.000 medallas (0) → 0,5 → vigilar (bien es estrictamente por encima)
-  assert.ok(Math.abs(by.c.score - 0.5) < 1e-9); assert.equal(by.c.verdict, 'vigilar');
-  // b: nada (-0,5) y 0 medallas (0,5 - 2,5 = -2) → -2,5 → expulsar
-  assert.ok(Math.abs(by.b.score + 2.5) < 1e-9); assert.equal(by.b.verdict, 'expulsar');
-  // d: 12 mazos/semana = 3 días de 4 y 1 de 0 → (0,5·3 - 0,5) / 4 = 0,25; 2.400 → 0,4 → 0,65 → bien
-  assert.ok(Math.abs(by.d.deckScore - 0.25) < 1e-9); assert.ok(Math.abs(by.d.medalScore - 0.4) < 1e-9);
+  const by = Object.fromEntries(CWSim.kickReport(w, m).rows.map((r) => [r.name, r]));
+  // a: 160/160 (+2) y 2.600 (+1,2) → 3,2 → bien
+  assert.ok(Math.abs(by.a.score - 3.2) < 1e-9); assert.equal(by.a.verdict, 'bien');
+  // c: 15/16 = 150/160 (+0,5) y 2.300 (0) → 0,5 → bien (vigilar es por debajo de +0,5)
+  assert.equal(Math.round(by.c.decks160), 150);
+  assert.ok(Math.abs(by.c.score - 0.5) < 1e-9); assert.equal(by.c.verdict, 'bien');
+  // d: 14/16 = 140/160 (−1,6) y 2.100 (−0,5) → −2,1 → expulsar
+  assert.ok(Math.abs(by.d.deckScore + 1.6) < 1e-9); assert.ok(Math.abs(by.d.medalScore + 0.5) < 1e-9);
+  assert.equal(by.d.verdict, 'expulsar');
+  // b: nada → expulsar
+  assert.equal(by.b.verdict, 'expulsar');
 });
 
 test('expulsión: hacen falta 4 semanas con datos', () => {
@@ -269,23 +295,17 @@ test('expulsión: hacen falta 4 semanas con datos', () => {
   assert.equal(by.n.verdict, 'nuevo');  // solo 3
 });
 
-test('expulsión: la media objetivo y el peso de las medallas mueven la nota', () => {
-  const w = CWSim.prepareHistory([1, 2, 3, 4].map((i) => ({ medals: 1, createdDate: `2026090${i}T095000.000Z`, players: [['#a', 16, 2300]] })));
-  const m = [{ tag: '#a', name: 'a' }];
-  const r1 = CWSim.kickReport(w, m, { medalTarget: 2400 }).rows[0];
-  const r2 = CWSim.kickReport(w, m, { medalTarget: 2200 }).rows[0];
-  const r3 = CWSim.kickReport(w, m, { medalTarget: 2200, medalWeight: 2 }).rows[0];
-  assert.ok(Math.abs(r1.medalScore - 0.4) < 1e-9);   // 100 por debajo de 2.400
-  assert.ok(Math.abs(r2.medalScore - 0.6) < 1e-9);   // 100 por encima de 2.200
-  assert.ok(Math.abs(r3.medalScore - 1.2) < 1e-9);   // con peso 2
-  assert.equal(r1.medalsPerWeek, 2300);
-});
-
-test('expulsión: coeficientes personalizados', () => {
-  const w = CWSim.prepareHistory([1, 2, 3, 4].map((i) => ({ medals: 1, createdDate: `2026090${i}T095000.000Z`, players: [['#a', 0, 2400]] })));
-  const r = CWSim.kickReport(w, [{ tag: '#a', name: 'a' }], { coef: [-3, -1, -1, 0, 1] }).rows[0];
-  assert.equal(r.deckScore, -3);
-  assert.ok(Math.abs(r.score - (-3 + 0.5)) < 1e-9);
+test('expulsión: cuentan las semanas en otro clan antes de entrar', () => {
+  // Solo 2 semanas en el clan, pero otras 2 registradas en otro clan
+  const w = CWSim.prepareHistory([4, 3, 2, 1].map((i) => ({ medals: 1, createdDate: `2026090${i}T095000.000Z`,
+    players: i >= 3 ? [['#a', 16, 2500]] : [] })));
+  const away = { '#a': { '2026-09-02': [16, 2500, 'Otro clan'], '2026-09-01': [8, 2500, 'Otro clan'] } };
+  const sin = CWSim.kickReport(w, [{ tag: '#a', name: 'a' }]).rows[0];
+  const con = CWSim.kickReport(w, [{ tag: '#a', name: 'a' }], { away }).rows[0];
+  assert.equal(sin.verdict, 'nuevo');
+  assert.equal(con.weeks, 4); assert.equal(con.awayWeeks, 2);
+  assert.equal(Math.round(con.decks160), 140); // 56 de 64 → 140 de 160
+  assert.equal(Math.round(con.medalsPerWeek), 2500);
 });
 
 test('simulación: las semanas recientes pesan más (1 · 0,9 … 0,1)', () => {

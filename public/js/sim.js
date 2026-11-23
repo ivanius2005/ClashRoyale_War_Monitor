@@ -580,13 +580,38 @@
 
   /* ---------- candidatos a expulsión ---------- */
 
-  // Coeficiente de cada día según los mazos jugados ese día (0, 1, 2, 3 o 4)
-  // Mazos jugados ese día: 0 → -0,5 · 1 → -1 · 2 → -0,75 · 3 → -0,25 · los 4 → +0,5
+  // Criterios del clan (por defecto) con las 10 últimas semanas de guerra:
+  //  · Medallas (media por semana):  más de 2.400 → +1 y +0,1 por cada 100 de más (2.500 = +1,1 · 2.650 = +1,25)
+  //                                  2.400 justas → +0,75 · de 2.200 a 2.399 → 0
+  //                                  menos de 2.200 → −0,25 y −0,25 por cada 100 de menos (2.100 = −0,5 · 2.000 = −0,75)
+  //  · Mazos (sobre 160 = 16 por semana × 10): 156 o más → +2 · de 148 a 155 → +0,5 · menos de 148 → −0,2 por cada mazo
+  //                                  que falte hasta 148 (140 = −1,6)
+  // Con menos semanas se escala a 160 (la parte jugada de los mazos posibles × 160).
+  // Cuentan las semanas en el clan y, si no estaba, las que haya registradas en otro clan (opts.away).
+  // Expulsar por debajo de −0,5; vigilar de −0,5 a +0,5; bien desde +0,5. Hacen falta 4 semanas con datos.
+  const KICK = { watchMargin: 1, minWeeks: 4, medalTarget: 2400, threshold: -0.5, deckMax: 160 };
+  // Se mantiene para la barra de días (orden de mejor a peor) y la compatibilidad con ajustes guardados
   const DEFAULT_DECK_COEF = [-0.5, -1, -0.75, -0.25, 0.5];
-  // medalTarget: media de medallas por semana que se pide (la del clan: 2.200)
-  // Medallas: llegar al objetivo semanal vale +0,5 y cada medalla de más o de menos, ±0,001 (±0,025 por cada 25).
-  // Expulsar por debajo de -0,5; vigilar entre -0,5 y 0,5; bien por encima de 0,5. Hacen falta 4 semanas con datos.
-  const KICK = { watchMargin: 1, minWeeks: 4, medalTarget: 2400, threshold: -0.5, medalBase: 0.5, medalStep: 0.001 };
+
+  function medalPoints(perWeek) {
+    const m = Math.round(perWeek);
+    if (m > 2400) return 1 + (perWeek - 2400) / 1000;
+    if (m === 2400) return 0.75;
+    if (m >= 2200) return 0;
+    return -0.25 - (2200 - perWeek) / 400;
+  }
+  function deckPoints(of160) {
+    const d = Math.round(of160);
+    if (d >= 156) return 2;
+    if (d >= 148) return 0.5;
+    return -0.2 * (148 - d);
+  }
+
+  // '20261019T093505.000Z' → '2026-10-19'
+  function weekKeyOf(createdDate) {
+    const m = /^(\d{4})(\d{2})(\d{2})/.exec(String(createdDate || ''));
+    return m ? `${m[1]}-${m[2]}-${m[3]}` : null;
+  }
 
   // Sin registro diario, reparte los mazos de la semana suponiendo días completos:
   // 13 mazos en 4 días → 4 + 4 + 4 + 1
@@ -602,23 +627,37 @@
   }
 
   /*
-   * Nota de cada miembro:  media del coeficiente de sus días + peso × (medallas por día ÷ 1.000)
+   * Nota de cada miembro = puntos de medallas + puntos de mazos (criterios de arriba)
    * weeks: salida de prepareHistory (la más reciente primero)
    * members: [{ tag, name }] (miembros actuales)
+   * opts: { weeks, threshold, watchMargin, minWeeks, away: { '#TAG': { '2026-10-19': [mazos, medallas, clan] } } }
    */
   function kickReport(weeks, members, opts) {
     opts = opts || {};
-    const coef = opts.coef || DEFAULT_DECK_COEF;
     const nWeeks = Math.max(1, opts.weeks || 10);
-    const medalWeight = opts.medalWeight == null ? 1 : opts.medalWeight;
-    const medalTarget = opts.medalTarget == null ? KICK.medalTarget : opts.medalTarget;
     const threshold = opts.threshold == null ? KICK.threshold : opts.threshold;
     const margin = opts.watchMargin == null ? KICK.watchMargin : opts.watchMargin;
     const minWeeks = opts.minWeeks == null ? KICK.minWeeks : opts.minWeeks;
+    const away = opts.away || {};
 
     const stats = new Map();
+    const statOf = (tag) => {
+      let r = stats.get(tag);
+      if (!r) stats.set(tag, (r = { weeks: 0, days: 0, counts: [0, 0, 0, 0, 0], decks: 0, medals: 0, exactDays: 0, awayWeeks: 0, clans: new Set() }));
+      return r;
+    };
+    const addDays = (r, days, exact) => {
+      for (const d of days) {
+        const k = clamp(Math.round(d), 0, RULES.decksPerDay);
+        r.counts[k] += 1;
+        r.decks += k;
+        r.days += 1;
+        if (exact) r.exactDays += 1;
+      }
+    };
     const used = weeks.slice(0, nWeeks);
     for (const w of used) {
+      const seen = new Set();
       for (const pl of w.players || []) {
         const [tag, decks, fame, exact] = pl;
         let days;
@@ -630,33 +669,41 @@
         } else {
           days = splitWeek(decks, w.days);
         }
-        let r = stats.get(tag);
-        if (!r) stats.set(tag, (r = { weeks: 0, days: 0, counts: [0, 0, 0, 0, 0], coefSum: 0, medals: 0, exactDays: 0 }));
+        const r = statOf(tag);
         r.weeks += 1;
         r.medals += fame || 0;
-        for (const d of days) {
-          const k = clamp(Math.round(d), 0, RULES.decksPerDay);
-          r.counts[k] += 1;
-          r.coefSum += coef[k];
-          r.days += 1;
-          if (isExact) r.exactDays += 1;
-        }
+        addDays(r, days, isExact);
+        seen.add(tag);
+      }
+      // Semanas en otro clan (índice de guerra o RoyaleAPI) de los miembros actuales que no estaban en este
+      const key = weekKeyOf(w.createdDate);
+      for (const m of members) {
+        if (seen.has(m.tag)) continue;
+        const a = away[m.tag] && key ? away[m.tag][key] : null;
+        if (!a) continue;
+        const r = statOf(m.tag);
+        r.weeks += 1;
+        r.awayWeeks += 1;
+        r.medals += a[1] || 0;
+        if (a[2]) r.clans.add(a[2]);
+        addDays(r, splitWeek(a[0], 4), false);
       }
     }
 
     const rows = members.map((m) => {
       const r = stats.get(m.tag);
-      const base = { tag: m.tag, name: m.name, weeks: r ? r.weeks : 0, days: r ? r.days : 0, counts: r ? r.counts : [0, 0, 0, 0, 0] };
+      const base = { tag: m.tag, name: m.name, weeks: r ? r.weeks : 0, days: r ? r.days : 0, counts: r ? r.counts : [0, 0, 0, 0, 0], awayWeeks: r ? r.awayWeeks : 0 };
       if (!r || r.weeks < minWeeks || !r.days) return Object.assign(base, { verdict: 'nuevo', score: null });
-      const deckScore = r.coefSum / r.days;
-      const medalsPerDay = r.medals / r.days;
-      const medalsPerWeek = r.medals / r.weeks; // media de las semanas en que estaba
-      const medalScore = medalWeight * (KICK.medalBase + (medalsPerWeek - medalTarget) * KICK.medalStep);
-      const score = deckScore + medalScore;
-      const verdict = score < threshold ? 'expulsar' : score <= threshold + margin ? 'vigilar' : 'bien';
+      const possible = r.days * RULES.decksPerDay;
+      const decks160 = (r.decks / possible) * KICK.deckMax;      // mazos jugados escalados a 160
+      const medalsPerWeek = (r.medals / r.days) * (4); // media por semana de 4 días de guerra
+      const medalScore = medalPoints(medalsPerWeek);
+      const deckScore = deckPoints(decks160);
+      const score = medalScore + deckScore;
+      const verdict = score < threshold ? 'expulsar' : score < threshold + margin ? 'vigilar' : 'bien';
       return Object.assign(base, {
-        verdict, score, deckScore, medalScore, medalsPerDay, medalsPerWeek, medals: r.medals,
-        exactShare: r.exactDays / r.days,
+        verdict, score, deckScore, medalScore, medalsPerWeek, decks160, decks: r.decks, possible,
+        medalsPerDay: r.medals / r.days, medals: r.medals, exactShare: r.exactDays / r.days, awayClans: [...r.clans],
       });
     });
 
@@ -667,7 +714,7 @@
   }
 
   return {
-    RULES, MODEL, KICK, DEFAULT_DECK_COEF, recencyWeight, mergeRuns, maxForLeft, maxDay, parseCrDate, splitWeek, kickReport, daysPlayed, prepareHistory, reliability, expectedDecks, weekPerDeck,
+    RULES, MODEL, KICK, DEFAULT_DECK_COEF, medalPoints, deckPoints, weekKeyOf, recencyWeight, mergeRuns, maxForLeft, maxDay, parseCrDate, splitWeek, kickReport, daysPlayed, prepareHistory, reliability, expectedDecks, weekPerDeck,
     defenseBonusFor, todayInputs, runToday, weekProgress, buildInputs, run,
   };
 });

@@ -126,12 +126,16 @@ def page_setup(out, title, subtitle, line2, when, clan):
     return doc
 
 
+CRITERIA = ("Medallas por semana: más de 2.400 → +1 y +0,1 por cada 100 más; 2.400 → +0,75; 2.200-2.399 → 0; "
+            "menos de 2.200 → −0,25 y −0,25 por cada 100 menos. Mazos sobre 160 (16 por semana × 10): 156 o más → +2; "
+            "148-155 → +0,5; menos de 148 → −0,2 por cada mazo que falte hasta 148.")
+
+
 def kick_note(k, opts):
-    c = opts['coef']
-    return (f"Nota = media de sus días (0 mazos {dec(c[0], 2)}, 1: {dec(c[1], 2)}, 2: {dec(c[2], 2)}, 3: {dec(c[3], 2)}, los 4: {dec(c[4], 2)}) "
-            f"+ {dec(opts['medalWeight'], 1)} × (0,5 + (medallas por semana − {fmt(opts.get('medalTarget', 2400))}) × 0,001), "
-            f"en las últimas {opts['weeksUsed']} semanas (hacen falta 4 con datos). Expulsar por debajo de {dec(opts['threshold'], 1)}; "
-            f"vigilar hasta {dec(opts['threshold'] + 1, 1)}; bien por encima.")
+    thr = opts['threshold']
+    return (f"Nota = puntos de medallas + puntos de mazos, en las últimas {opts['weeksUsed']} semanas (también las que "
+            f"jugó en otro clan antes de entrar; hacen falta {opts.get('minWeeks', 4)} con datos). {CRITERIA} "
+            f"Expulsar por debajo de {dec(thr, 1)}; vigilar hasta {dec(opts.get('watchUpTo', thr + 1), 1)}; bien desde ahí.")
 
 
 def build_clan(data, out):
@@ -152,15 +156,15 @@ def build_clan(data, out):
 
     # ----- Expulsiones -----
     story.append(Paragraph('Candidatos a expulsión', S['h2']))
-    flagged = exp + vig
+    flagged = sorted(exp, key=lambda p: p['kick']['score']) + sorted(vig, key=lambda p: p['kick']['score'])
     if flagged:
-        rows = [B.hdr(['Veredicto', 'Jugador', 'Nota', 'Días sin jugar', 'Días con 1-2', 'Medallas/día', 'Media/sem.', 'Tendencia'], left=2)]
+        rows = [B.hdr(['Veredicto', 'Jugador', 'Nota', 'Med./sem.', 'Ptos. med.', 'Mazos /160', 'Ptos. mazos', 'Tendencia'], left=2)]
         for p in flagged:
             k = p['kick']; v = VERDICT[k['verdict']]; t = TREND[p['trend']['label']]
             rows.append([badge(v[0], v[1]), Paragraph(rich(p['name']) + f' <font size="6.5" color="#5E6E66">{esc(p["role"])}</font>', S['cell']),
-                         dec(k['score'], 2), str(k['counts'][0]), str(k['counts'][1] + k['counts'][2]), fmt(k['medalsPerDay']),
-                         fmt(p['avgWeek']), badge(t[0], t[1])])
-        t = Table(rows, colWidths=[56, 150, 40, 54, 52, 56, 50, CW - 458], repeatRows=1)
+                         dec(k['score'], 2), fmt(k.get('medalsPerWeek')), dec(k.get('medalScore'), 2),
+                         fmt(k.get('decks160')), dec(k.get('deckScore'), 2), badge(t[0], t[1])])
+        t = Table(rows, colWidths=[56, 140, 40, 60, 48, 52, 52, CW - 448], repeatRows=1)
         st = B.base_style(len(rows), numeric_from=2); t.setStyle(TableStyle(st))
         story.append(t)
     else:
@@ -324,9 +328,10 @@ def build_player(data, out):
     k = p['kick']; v = VERDICT[k['verdict']]
     story += [Paragraph('Situación de expulsión', S['h2']),
               Paragraph(f'<font color="{hexc(v[1])}"><b>{v[0]}</b></font> · nota {dec(k["score"], 2)} · '
-                        f'{k["counts"][0]} días sin jugar, {k["counts"][1] + k["counts"][2]} con 1-2 mazos, '
-                        f'{k["counts"][3]} con 3 y {k["counts"][4]} con los 4, en {k["days"]} días de guerra · '
-                        f'{fmt(k["medalsPerDay"])} medallas por día.', S['p']),
+                        f'{fmt(k.get("medalsPerWeek"))} medallas por semana ({dec(k.get("medalScore"), 2)}) · '
+                        f'{fmt(k.get("decks160"))} de 160 mazos ({dec(k.get("deckScore"), 2)}) · '
+                        f'{k["counts"][0]} días sin jugar en {k["days"]} días de guerra'
+                        + (f' · {k["awayWeeks"]} semanas en otro clan' if k.get('awayWeeks') else '') + '.', S['p']),
               Paragraph(kick_note(k, opts), S['note'])]
     doc.build(story)
 

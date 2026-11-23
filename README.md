@@ -25,9 +25,9 @@ Busca cualquier clan por su nombre o por su tag. La web tiene cuatro pestañas.
 - Se puede consultar para tu clan y para los rivales. La tabla se ordena por cualquier columna.
 
 **03 · Expulsiones**
-- Una nota para cada miembro según los mazos que juega cada día y las medallas que consigue en las últimas semanas (de 1 a 10, eliges tú).
+- Una nota para cada miembro según su media de medallas por semana y los mazos que juega sobre 160 en las últimas semanas (10 por defecto), contando también las semanas en otro clan antes de entrar.
 - Veredicto por jugador (expulsar, vigilar, bien o sin evaluar), barra con el reparto de sus días y botón para copiar la lista.
-- Coeficientes, peso de las medallas y nota mínima ajustables; se recuerdan en el navegador.
+- Semanas y nota mínima ajustables; se recuerdan en el navegador. La misma nota decide «apto / no apto» al reclutar (ficha de jugador).
 
 **04 · Simulación de la semana (Monte Carlo)**
 - Probabilidad de quedar 1º, 2º… 5º y el puesto esperado de cada clan.
@@ -57,20 +57,29 @@ Antes del primer día de batalla se estiman con la semana anterior, porque se re
 (3.000 / 1.800 / 1.000 / 600 / 400) + bonus de sus defensas, junto a la probabilidad de quedar en
 ese puesto. El «esperado hoy» es la media ponderada por esas probabilidades.
 
-**Nota de expulsión.** Cada día de guerra vale según los mazos que jugó el jugador ese día:
-
-| Mazos en el día | 0 | 1 | 2 | 3 | 4 |
-|---|---|---|---|---|---|
-| Coeficiente | −1 | −3 | −2 | +0,5 | +1 |
+**Nota de expulsión (y de reclutamiento).** Con las 10 últimas semanas de guerra (en el clan y, si no estaba, en
+otro clan con registro: índice de guerra del monitor o RoyaleAPI):
 
 ```
-Nota = media de los coeficientes de sus días + peso × (medallas por día ÷ 1.000)
+Nota = puntos de medallas + puntos de mazos
 ```
 
-La parte de mazos va de −3 a +1, y las medallas se dividen entre 1.000, que es el máximo de un día
-(4 duelos ganados). Por debajo de la nota mínima (0 por defecto): expulsar; hasta 0,75 por encima:
-vigilar. Quien tenga menos de 4 días de guerra en el periodo sale como «sin evaluar». Los días
-posteriores a cruzar la meta no cuentan.
+| Medallas por semana (media) | Puntos |
+|---|---|
+| más de 2.400 | +1 y +0,1 por cada 100 más (2.500 = +1,1 · 2.650 = +1,25) |
+| 2.400 | +0,75 |
+| 2.200 a 2.399 | 0 |
+| menos de 2.200 | −0,25 y −0,25 por cada 100 menos (2.100 = −0,5 · 2.000 = −0,75) |
+
+| Mazos jugados de 160 (16 por semana × 10) | Puntos |
+|---|---|
+| 156 o más | +2 |
+| 148 a 155 | +0,5 |
+| menos de 148 | −0,2 por cada mazo que falte hasta 148 (140 = −1,6) |
+
+Con menos semanas, los mazos se escalan a 160 y las medallas son la media por semana de 4 días de guerra.
+Por debajo de −0,5: expulsar (no apto); de −0,5 a +0,5: vigilar (a revisar); desde +0,5: bien (apto). Quien
+tenga menos de 4 semanas con datos sale como «sin evaluar» (no hay datos suficientes).
 
 **Registro diario de mazos.** La API solo da los mazos de cada jugador por semana (0-16), no por
 día, y con estos coeficientes el reparto importa mucho: 8 mazos como 4+4+0+0 dan 0, pero como
@@ -310,8 +319,7 @@ En el monitor completo (`/monitor`), pestañas «Jugadores» y «Expulsiones»:
 - **Ficha PDF** de cada jugador (en la lista de expulsiones): sus 10 semanas frente a la media del clan,
   semana a semana y su situación de expulsión.
 
-Usan los mismos ajustes de expulsión que tengas en la web (semanas, peso de medallas, media objetivo por semana, umbral y
-coeficientes). Rutas: `GET /api/players.pdf` y `GET /api/player.pdf?tag=%23TAG`.
+Usan los mismos ajustes de expulsión que tengas en la web (semanas y nota mínima). Rutas: `GET /api/players.pdf` y `GET /api/player.pdf?tag=%23TAG`.
 
 ### 7 · Informe de las 08:00
 

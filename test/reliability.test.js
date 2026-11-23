@@ -7,7 +7,7 @@ const recorder = require('../lib/recorder');
 const wk = (medals, clan = '#A', decks = 16) => ({ decks, medals, clan });
 
 test('fiabilidad: estable y fiel con buena nota es alta; a rachas y cambiando de clan, baja', () => {
-  const good = reliability({ score: 1.4, weeks: Array.from({ length: 10 }, () => wk(2900)) });
+  const good = reliability({ score: 3.2, weeks: Array.from({ length: 10 }, () => wk(2900)) });
   assert.equal(good.label, 'Alta'); assert.equal(good.streak, 10); assert.ok(good.index >= 90);
   const bad = reliability({ score: -1, weeks: [wk(3000, '#B'), wk(200, '#B'), wk(2800, '#C'), wk(100, '#D'), null, wk(1500, '#E')] });
   assert.equal(bad.label, 'Baja'); assert.equal(bad.streak, 2); assert.equal(bad.clans, 4);

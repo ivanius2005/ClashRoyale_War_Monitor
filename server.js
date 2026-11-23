@@ -281,7 +281,7 @@ function raceClanTags(race) {
 const PlayerView = require('./lib/player-view');
 const Analysis = require('./lib/analysis');
 const CWSim = require('./public/js/sim.js');
-const { WarIndex, lastWeekKeys } = require('./lib/war-index');
+const { WarIndex, lastWeekKeys, weekKey } = require('./lib/war-index');
 const warIndex = new WarIndex(path.join(CONFIG.dataDir, 'war-index.json'));
 setInterval(() => warIndex.save(), 10 * 60e3).unref();
 const { reliability } = require('./lib/reliability');
@@ -353,7 +353,8 @@ function getPlayerWar(tag) {
       evaluation = { verdict: row.verdict, apt: APT[row.verdict] || row.verdict, score: row.score, deckScore: row.deckScore, medalScore: row.medalScore,
         reliability: reliability({ score: row.score, weeks: weeks.map((w) => (w.known ? { decks: w.decks, medals: w.medals, clan: w.clan.tag || w.clan.name } : null)) }),
         medalsPerWeek: row.medalsPerWeek, weeks: known.length,
-        rules: { medalTarget: CWSim.KICK.medalTarget, threshold: CWSim.KICK.threshold, watchUpTo: CWSim.KICK.threshold + CWSim.KICK.watchMargin, minWeeks: CWSim.KICK.minWeeks, coef: CWSim.DEFAULT_DECK_COEF } };
+        decks160: row.decks160,
+        rules: { medalTarget: CWSim.KICK.medalTarget, threshold: CWSim.KICK.threshold, watchUpTo: CWSim.KICK.threshold + CWSim.KICK.watchMargin, minWeeks: CWSim.KICK.minWeeks } };
     }
     // Referencia: media por jugador del clan de casa en esas semanas (quien jugó al menos un mazo)
     let home = null;
@@ -469,9 +470,29 @@ function reduceRaceLog(items, tag, currentSectionIndex, withNames) {
   }).filter(Boolean);
 }
 
+// Semanas que los miembros actuales de un clan jugaron en OTRO clan (índice de guerra o RoyaleAPI), para las semanas
+// del historial en que no estaban en este: { '#TAG': { '2026-10-19': [mazos, medallas, nombre del clan] } }
+function awayWeeks(weeks, roster, clanTag) {
+  const out = {};
+  for (const m of roster || []) {
+    const idx = warIndex.get(m.tag);
+    const imp = warIndex.getImported(m.tag);
+    for (const w of weeks) {
+      if ((w.players || []).some((p) => p[0] === m.tag)) continue;
+      const k = weekKey(w.createdDate);
+      const o = idx[k];
+      const r = imp[k];
+      const e = r && (!o || r.decks > o.decks || (r.decks === o.decks && r.medals > o.medals)) ? r : o;
+      if (!e || (e.clan && e.clan.tag === clanTag)) continue;
+      (out[m.tag] || (out[m.tag] = {}))[k] = [e.decks || 0, e.medals || 0, (e.clan && (e.clan.name || e.clan.tag)) || ''];
+    }
+  }
+  return out;
+}
+
 function getHistory(tag) {
   return cached(`history:${tag}`, CONFIG.historyCacheMs, async () => {
-    const { race } = await getWar(tag);
+    const { race, rosters } = await getWar(tag);
     const clans = {};
     await Promise.all(raceClanTags(race).map(async (t) => {
       try {
@@ -484,7 +505,7 @@ function getHistory(tag) {
           const covered = recorder.attachDays(weeks, counts);
           daily = { since: counts.length ? new Date(counts[0].start).toISOString() : null, weeksCovered: covered };
         }
-        clans[t] = { weeks, daily };
+        clans[t] = { weeks, daily, away: awayWeeks(weeks, rosters && rosters[t], t) };
       } catch (e) {
         clans[t] = { weeks: null, error: e.message };
       }

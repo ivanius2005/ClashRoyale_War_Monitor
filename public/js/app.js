@@ -25,15 +25,15 @@ const state = {
 
 // Ajustes de la pestaña de expulsiones (se recuerdan en este navegador)
 function loadKickPrefs() {
-  // Ajustes nuevos (cw:kick2): los de la fórmula anterior ya no valen
-  const def = { weeks: 10, medal: 1, target: window.CWSim.KICK.medalTarget, thr: window.CWSim.KICK.threshold, coef: window.CWSim.DEFAULT_DECK_COEF.slice() };
+  // cw:kick3 = criterios por medallas/semana y mazos sobre 160 (los ajustes de fórmulas anteriores ya no valen)
+  const def = { weeks: 10, thr: window.CWSim.KICK.threshold };
   try {
-    const saved = JSON.parse(localStorage.getItem('cw:kick2') || 'null');
-    if (saved && Array.isArray(saved.coef) && saved.coef.length === 5) return Object.assign(def, saved);
+    const saved = JSON.parse(localStorage.getItem('cw:kick3') || 'null');
+    if (saved && isFinite(saved.weeks) && isFinite(saved.thr)) return Object.assign(def, { weeks: saved.weeks, thr: saved.thr });
   } catch {}
   return def;
 }
-function saveKickPrefs() { try { localStorage.setItem('cw:kick2', JSON.stringify(state.kick)); } catch {} }
+function saveKickPrefs() { try { localStorage.setItem('cw:kick3', JSON.stringify(state.kick)); } catch {} }
 
 /* ---------- formato ---------- */
 const fmt = (n) => (n == null || !isFinite(n)) ? '—' : String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
@@ -914,7 +914,7 @@ function setPdfButton(el, href) {
 }
 function kickQuery(tag) {
   const k = state.kick;
-  const q = new URLSearchParams({ weeks: k.weeks, medal: k.medal, target: k.target, thr: k.thr, coef: k.coef.join(',') });
+  const q = new URLSearchParams({ weeks: k.weeks, thr: k.thr });
   if (tag) q.set('tag', tag);
   return q.toString();
 }
@@ -925,15 +925,12 @@ function renderKick() {
   $('kClan').innerHTML = m.clans.map((c) => `<option value="${esc(c.tag)}"${c.tag === state.kickClan ? ' selected' : ''}>${esc(c.name)}${c.tag === m.own ? ' (tu clan)' : ''}</option>`).join('');
 
   const k = state.kick;
-  $('kCoefs').querySelectorAll('input[data-k]').forEach((inp) => {
-    if (document.activeElement !== inp) inp.value = String(k.coef[+inp.dataset.k]);
-  });
-  $('kMedal').value = k.medal; $('kMedalOut').textContent = `×${dec(k.medal, k.medal % 1 ? 2 : 0)}`;
   $('kThr').value = k.thr; $('kThrOut').textContent = sdec(k.thr, 1).replace(/^\+/, '');
-  if (document.activeElement !== $('kTarget')) $('kTarget').value = k.target;
-  $('kFormula').innerHTML = `<b>Nota</b> = media de los mazos de cada día <em>+ ${dec(k.medal, k.medal % 1 ? 2 : 0)} × (0,5 + (medallas/semana − ${fmt(k.target)}) × 0,001)</em><br>` +
-    `Expulsar por debajo de <b>${sdec(k.thr, 1).replace(/^\+/, '')}</b> · vigilar hasta <b>${sdec(k.thr + Sim.KICK.watchMargin, 1).replace(/^\+/, '')}</b> · bien por encima · hacen falta ${Sim.KICK.minWeeks} semanas con datos`;
-  $('kLegend').innerHTML = DAY_ORDER.map((d) => `<span><i class="sw d${d}"></i>${d} ${d === 1 ? 'mazo' : 'mazos'} (${sdec(k.coef[d], Number.isInteger(k.coef[d]) ? 0 : Number.isInteger(k.coef[d] * 10) ? 1 : 2)})</span>`).join('');
+  $('kFormula').innerHTML = '<b>Nota</b> = puntos de medallas + puntos de mazos<br>' +
+    '<em>Medallas por semana:</em> más de 2.400 → +1 y +0,1 por cada 100 más · 2.400 → +0,75 · 2.200-2.399 → 0 · menos de 2.200 → −0,25 y −0,25 por cada 100 menos<br>' +
+    '<em>Mazos sobre 160:</em> 156 o más → +2 · 148-155 → +0,5 · menos de 148 → −0,2 por cada mazo que falte hasta 148<br>' +
+    `Expulsar por debajo de <b>${sdec(k.thr, 1).replace(/^\+/, '')}</b> · vigilar hasta <b>${sdec(k.thr + Sim.KICK.watchMargin, 1).replace(/^\+/, '')}</b> · bien desde ahí · hacen falta ${Sim.KICK.minWeeks} semanas con datos`;
+  $('kLegend').innerHTML = DAY_ORDER.map((d) => `<span><i class="sw d${d}"></i>${d === 4 ? 'los 4 mazos' : d === 0 ? 'sin jugar' : `${d} ${d === 1 ? 'mazo' : 'mazos'}`}</span>`).join('');
 
   if (!historyReady()) {
     $('kTiles').innerHTML = ''; $('kNotes').innerHTML = '';
@@ -952,7 +949,7 @@ function renderKick() {
   $('kWeeks').max = maxW; $('kWeeks').value = nW;
   $('kWeeksOut').textContent = nW === 1 ? '1 semana' : `${nW} semanas`;
 
-  const rep = Sim.kickReport(weeks, rosterOf(state.kickClan), { weeks: nW, medalWeight: k.medal, medalTarget: k.target, threshold: k.thr, coef: k.coef });
+  const rep = Sim.kickReport(weeks, rosterOf(state.kickClan), { weeks: nW, threshold: k.thr, away: (entry && entry.away) || {} });
   const ownPdf = pdfOn() && isHomeClan() && state.kickClan === m.own; // los PDF son del clan de casa
   setPdfButton($('kPdf'), `api/players.pdf?${kickQuery()}`);
   if (state.kickClan !== m.own) $('kPdf').hidden = true;
@@ -975,14 +972,15 @@ function renderKick() {
     const total = r.days || 1;
     const segs = DAY_ORDER.map((d) => (r.counts[d] ? `<i class="d${d}" style="width:${(r.counts[d] / total) * 100}%"></i>` : '')).join('');
     const est = r.exactShare != null && r.exactShare < 1 ? ` · ${r.exactShare === 0 ? 'estimado' : `${pct(1 - r.exactShare)} estimado`}` : '';
-    const tip = `${r.days} días en ${r.weeks} ${r.weeks === 1 ? 'semana' : 'semanas'}${est}`;
-    const scoreTip = r.score == null ? 'pocos datos' : `mazos ${sdec(r.deckScore)}, medallas ${sdec(r.medalScore)}`;
+    const awayTxt = r.awayWeeks ? ` · ${r.awayWeeks} en otro clan${r.awayClans && r.awayClans.length ? ` (${r.awayClans.join(', ')})` : ''}` : '';
+    const tip = `${r.weeks} ${r.weeks === 1 ? 'semana' : 'semanas'} con datos${awayTxt}${est}`;
+    const scoreTip = r.score == null ? 'pocos datos' : `medallas ${sdec(r.medalScore)} + mazos ${sdec(r.deckScore)}`;
     const pdf = ownPdf ? `<a class="kpdf" href="api/player.pdf?${esc(kickQuery(r.tag))}" target="_blank" rel="noopener" title="Ficha PDF de ${esc(r.name)}" aria-label="Ficha PDF de ${esc(r.name)}"><svg class="ic"><use href="#i-download"/></svg></a>` : '';
     return `<div class="krow v-${r.verdict}">
       <div class="kv"><span class="verdict ${r.verdict}">${ic(v.icon)}${v.label}</span></div>
       <div class="kname"><span class="cname" title="${esc(tip)}">${esc(r.name)}</span>${pdf}</div>
       <div class="kdays"><span class="dbar" title="${esc(kickSummary(r.counts))}" aria-label="${esc(kickSummary(r.counts))}">${segs}</span></div>
-      <div class="kmed"><b>${r.medalsPerWeek != null ? fmt(r.medalsPerWeek) : '—'}</b><small>medallas/sem.</small></div>
+      <div class="kmed"><b>${r.medalsPerWeek != null ? fmt(r.medalsPerWeek) : '—'}</b><small>medallas/sem. · ${r.decks160 != null ? `${Math.round(r.decks160)}/160 mazos` : 'pocos datos'}${r.awayWeeks ? ` · ${r.awayWeeks} fuera` : ''}</small></div>
       <div class="kscore" title="${esc(scoreTip)}"><b>${r.score == null ? '—' : sdec(r.score).replace(/^\+/, '')}</b></div>
     </div>`;
   };
@@ -1002,21 +1000,15 @@ function renderKick() {
     notes.push('Todas las semanas usan los mazos reales de cada día (registro diario).');
   }
   if (entry && entry.daily && entry.daily.since) notes.push(`Registro diario activo desde el ${new Date(entry.daily.since).toLocaleDateString('es-ES')}.`);
-  notes.push(`Quien tenga menos de ${Sim.KICK.minWeeks} semanas con datos en el periodo sale como «sin evaluar». Si un clan cruzó la meta antes del último día, esos días no cuentan.`);
+  notes.push('Las semanas en que un miembro aún no estaba en el clan cuentan si hay registro de él en otro clan (índice de guerra del monitor o RoyaleAPI). Los mazos se escalan a 160 con las semanas que tenga, y las medallas son la media por semana de 4 días.');
+  notes.push(`Quien tenga menos de ${Sim.KICK.minWeeks} semanas con datos sale como «sin evaluar» (no hay datos suficientes). Si un clan cruzó la meta antes del último día, esos días no cuentan.`);
   $('kNotes').innerHTML = notes.map((x) => `<li>${esc(x)}</li>`).join('');
 }
 
 function kickInput() {
   const k = state.kick;
   k.weeks = Number($('kWeeks').value);
-  k.medal = Number($('kMedal').value);
-  const tg = Number($('kTarget').value);
-  if (isFinite(tg) && tg >= 0 && tg <= 6000) k.target = Math.round(tg);
   k.thr = Math.round(Number($('kThr').value) * 10) / 10;
-  $('kCoefs').querySelectorAll('input[data-k]').forEach((inp) => {
-    const v = parseFloat(String(inp.value).replace(',', '.'));
-    if (isFinite(v)) k.coef[+inp.dataset.k] = v;
-  });
   saveKickPrefs();
   renderKick();
 }
@@ -1210,7 +1202,7 @@ $('plTable').addEventListener('click', (e) => {
 });
 
 $('kClan').addEventListener('change', (e) => { state.kickClan = e.target.value; renderKick(); });
-['kWeeks', 'kMedal', 'kThr', 'kTarget'].forEach((id) => $(id).addEventListener('input', kickInput));
+['kWeeks', 'kThr'].forEach((id) => $(id).addEventListener('input', kickInput));
 // En la demo no hay servidor: los botones de PDF explican qué hacen en la web real
 document.addEventListener('click', (e) => {
   const a = e.target.closest('a.btn.pdf, a.kpdf');
@@ -1221,17 +1213,15 @@ document.addEventListener('click', (e) => {
   t.textContent = a.classList.contains('kpdf') ? 'En la web real, aquí se descarga la ficha PDF de este jugador.' : 'En la web real, aquí se descarga el informe de jugadores en PDF.';
   t.classList.add('on'); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('on'), 2600);
 });
-$('kCoefs').addEventListener('change', kickInput);
-$('kReset').addEventListener('click', () => { state.kick.coef = Sim.DEFAULT_DECK_COEF.slice(); saveKickPrefs(); renderKick(); });
 $('kCopy').addEventListener('click', async () => {
   if (!state.model || !state.history) return;
   const clan = state.model.clans.find((c) => c.tag === state.kickClan) || state.model.clans[0];
   const entry = state.history.clans ? state.history.clans[clan.tag] : null;
   const k = state.kick;
-  const rep = Sim.kickReport(Sim.prepareHistory(entry && entry.weeks), rosterOf(clan.tag), { weeks: k.weeks, medalWeight: k.medal, medalTarget: k.target, threshold: k.thr, coef: k.coef });
+  const rep = Sim.kickReport(Sim.prepareHistory(entry && entry.weeks), rosterOf(clan.tag), { weeks: k.weeks, threshold: k.thr, away: (entry && entry.away) || {} });
   const out = rep.rows.filter((r) => r.verdict === 'expulsar');
   const text = `${clan.name}: candidatos a expulsión (últimas ${rep.weeksUsed} semanas)\n` +
-    (out.length ? out.map((r) => `- ${r.name}: nota ${sdec(r.score).replace(/^\+/, '')} (${kickSummary(r.counts)})`).join('\n') : 'Nadie por debajo del umbral.');
+    (out.length ? out.map((r) => `- ${r.name}: nota ${sdec(r.score).replace(/^\+/, '')} (${fmt(r.medalsPerWeek)} medallas/sem., ${Math.round(r.decks160)}/160 mazos)`).join('\n') : 'Nadie por debajo del umbral.');
   const label = $('kCopy').querySelector('span');
   try { await navigator.clipboard.writeText(text); label.textContent = '¡Copiada!'; }
   catch { label.textContent = 'No se pudo copiar'; }

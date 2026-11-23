@@ -220,32 +220,16 @@
         <h2 id="kTitle">Candidatos a expulsión</h2>
         <div class="aside"><a class="btn pdf" id="kPdf" href="api/players.pdf" target="_blank" rel="noopener" hidden><svg class="ic"><use href="#i-download"/></svg><span>Informe PDF</span></a><button type="button" class="btn" id="kCopy"><svg class="ic"><use href="#i-copy"/></svg><span>Copiar la lista</span></button></div>
       </div>
-      <p class="fsub" hidden>Una nota para cada miembro según los mazos que juega cada día y las medallas que consigue. Cuanto más baja, más motivos para expulsarle.</p>
+      <p class="fsub" hidden>Una nota para cada miembro según su media de medallas por semana y los mazos que juega de 160 en las 10 últimas semanas. Cuanto más baja, más motivos para expulsarle.</p>
       <form class="kctl" id="kForm">
         <label for="kClan">Clan <select id="kClan"></select></label>
         <label>Semanas a tener en cuenta
           <span class="rangebox"><input type="range" id="kWeeks" min="1" max="10" step="1" value="10"><output id="kWeeksOut" for="kWeeks">10</output></span>
         </label>
-        <label>Peso de las medallas
-          <span class="rangebox"><input type="range" id="kMedal" min="0" max="3" step="0.25" value="1"><output id="kMedalOut" for="kMedal">×1</output></span>
-        </label>
-        <label>Media objetivo por semana <span class="rangebox"><input type="number" id="kTarget" min="0" max="6000" step="50" value="2400" inputmode="numeric"></span>
-        </label>
         <label>Nota mínima para quedarse
           <span class="rangebox"><input type="range" id="kThr" min="-2" max="1.5" step="0.1" value="-0.5"><output id="kThrOut" for="kThr">−0,5</output></span>
         </label>
       </form>
-      <details class="kcoef">
-        <summary>Coeficiente de cada día según los mazos jugados</summary>
-        <div class="coefs" id="kCoefs">
-          <label>0 mazos<input type="number" step="0.5" data-k="0"></label>
-          <label>1 mazo<input type="number" step="0.5" data-k="1"></label>
-          <label>2 mazos<input type="number" step="0.5" data-k="2"></label>
-          <label>3 mazos<input type="number" step="0.5" data-k="3"></label>
-          <label>4 mazos<input type="number" step="0.5" data-k="4"></label>
-          <button type="button" class="btn" id="kReset">Restablecer</button>
-        </div>
-      </details>
       <p class="formula" id="kFormula"></p>
       <div class="tiles t4" id="kTiles"></div>
       <div class="legend" aria-hidden="true" id="kLegend"></div>

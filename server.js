@@ -528,7 +528,6 @@ function getWar(tag) {
       if (e && e.status === 404 && !isHome(tag)) notFound.set(`war:${tag}`, Date.now()); // tag inexistente: recordarlo
       throw e;
     });
-    if (CONFIG.trackClans.includes(tag)) record(tag, race);
     // Miembros actuales de los 5 clanes: sirven para saber quién puede jugar todavía
     // (los "participants" incluyen a gente que ya se fue del clan).
     const rosters = {};
@@ -540,6 +539,10 @@ function getWar(tag) {
         rosters[t] = null; // la web avisará y usará los participantes como respaldo
       }
     }));
+    if (CONFIG.trackClans.includes(tag)) {
+      const own = rosters[`#${tag}`];
+      record(tag, race, own ? own.map((m) => m.tag) : null);
+    }
     return { fetchedAt: new Date().toISOString(), race, rosters };
   });
 }
@@ -769,10 +772,10 @@ function scheduleReports() {
 
 /* ---------- registro diario de mazos ---------- */
 
-function record(tag, race) {
+function record(tag, race, members) {
   try {
     const file = recorder.fileFor(CONFIG.dataDir, tag);
-    recorder.save(file, recorder.observe(recorder.load(file), race, Date.now()));
+    recorder.save(file, recorder.observe(recorder.load(file), race, Date.now(), members));
   } catch (e) {
     console.error(`Registro diario de #${tag}: ${e.message}`);
   }
@@ -780,7 +783,11 @@ function record(tag, race) {
 
 async function recordAll() {
   for (const tag of CONFIG.trackClans) {
-    try { record(tag, await cr(`/clans/%23${tag}/currentriverrace`)); }
+    try {
+      const race = await cr(`/clans/%23${tag}/currentriverrace`);
+      const mem = await cr(`/clans/%23${tag}/members?limit=50`).catch(() => null);
+      record(tag, race, mem ? (mem.items || []).map((m) => m.tag) : null);
+    }
     catch (e) { console.error(`Registro diario de #${tag}: ${e.message}`); }
   }
 }

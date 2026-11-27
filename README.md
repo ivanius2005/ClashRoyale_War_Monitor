@@ -85,9 +85,9 @@ Nota = puntos de medallas + puntos de mazos
 | menos de 148 | −0,2 por cada mazo que falte hasta 148 (140 = −1,6) |
 
 Con menos semanas, los mazos se escalan a 160 y las medallas son la media por semana de 4 días de guerra.
-Para no dar métricas falsas: con registro diario solo cuentan los días en que era miembro; sin él, la semana en que
-llegó (no estaba la anterior) o en que se cambió de clan solo cuenta los días que jugó, y una semana a 0 solo cuenta
-si estaba la semana anterior y siguió después (si no, estaba fuera o de paso).
+Para no dar métricas falsas solo cuentan los días en que el miembro participó (1 mazo o más): una semana a 0 no
+cuenta (estaba fuera del clan o no le tocaba) y un sustituto se evalúa por los días que jugó. Sí penaliza dejarse
+mazos un día en que jugó y, desde que el registro diario guarda quién es miembro cada día, un día a 0 estando dentro.
 Por debajo de −0,5: expulsar (no apto); de −0,5 a +0,5: vigilar (a revisar); desde +0,5: bien (apto). Quien
 tenga menos de 4 semanas con datos sale como «sin evaluar» (no hay datos suficientes).
 

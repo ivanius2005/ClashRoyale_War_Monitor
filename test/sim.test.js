@@ -283,8 +283,8 @@ test('expulsión: nota, veredictos y escala a 160 con menos semanas', () => {
   // d: 14/16 = 140/160 (−1,6) y 2.100 (−0,5) → −2,1 → expulsar
   assert.ok(Math.abs(by.d.deckScore + 1.6) < 1e-9); assert.ok(Math.abs(by.d.medalScore + 0.5) < 1e-9);
   assert.equal(by.d.verdict, 'expulsar');
-  // b: nada → expulsar
-  assert.equal(by.b.verdict, 'expulsar');
+  // b: no participó ninguna semana → no hay datos (las semanas a 0 no cuentan)
+  assert.equal(by.b.verdict, 'nuevo'); assert.equal(by.b.skippedWeeks, 4);
 });
 
 test('expulsión: hacen falta 4 semanas con datos', () => {
@@ -304,8 +304,8 @@ test('expulsión: cuentan las semanas en otro clan antes de entrar', () => {
   const con = CWSim.kickReport(w, [{ tag: '#a', name: 'a' }], { away }).rows[0];
   assert.equal(sin.verdict, 'nuevo');
   assert.equal(con.weeks, 4); assert.equal(con.awayWeeks, 2);
-  assert.equal(Math.round(con.decks160), 140); // 56 de 64 → 140 de 160
-  assert.equal(Math.round(con.medalsPerWeek), 2500);
+  assert.equal(Math.round(con.decks160), 160); // en otro clan solo cuentan los días que jugó
+  assert.equal(Math.round(con.medalsPerWeek), 2857); // 10.000 medallas en 14 días jugados × 4
 });
 
 test('simulación: las semanas recientes pesan más (1 · 0,9 … 0,1)', () => {
@@ -353,7 +353,7 @@ test('expulsión: la semana de llegada solo cuenta los días que jugó', () => {
   assert.equal(row.verdict, 'bien');
 });
 
-test('expulsión: una semana a 0 sin estar antes no cuenta; entre dos semanas jugadas sí', () => {
+test('expulsión: las semanas a 0 no cuentan y el sustituto cuenta solo sus días', () => {
   const mk = (rows) => CWSim.prepareHistory(rows.map((x, i) => ({
     medals: 1, createdDate: `202609${String(20 - i).padStart(2, '0')}T095000.000Z`, players: x ? [['#a', x[0], x[1]]] : [['#otro', 16, 2000]],
   })));
@@ -361,7 +361,24 @@ test('expulsión: una semana a 0 sin estar antes no cuenta; entre dos semanas ju
   // 0 en su primera aparición (estaba fuera / de paso): no cuenta
   const fuera = CWSim.kickReport(mk([[16, 2400], [16, 2400], [16, 2400], [16, 2400], [0, 0], null]), m).rows[0];
   assert.equal(fuera.skippedWeeks, 1); assert.equal(fuera.weeks, 4); assert.equal(Math.round(fuera.decks160), 160);
-  // 0 entre semanas jugadas en el clan: sí cuenta (no jugó estando dentro)
+  // Cualquier semana a 0 se ignora (no fue partícipe)
   const dentro = CWSim.kickReport(mk([[16, 2400], [16, 2400], [0, 0], [16, 2400], [16, 2400]]), m).rows[0];
-  assert.equal(dentro.skippedWeeks, 0); assert.equal(dentro.weeks, 5); assert.equal(Math.round(dentro.decks160), 128);
+  assert.equal(dentro.skippedWeeks, 1); assert.equal(dentro.weeks, 4); assert.equal(Math.round(dentro.decks160), 160);
+  // Sustituto: solo cuentan los días que jugó; dejarse mazos un día en que jugó sí penaliza
+  const W = (rows) => CWSim.prepareHistory(rows.map((x, i) => ({ medals: 1, createdDate: `202609${String(20 - i).padStart(2, '0')}T095000.000Z`, players: [['#s', x[0], x[1], x[2]]] })));
+  const sub = CWSim.kickReport(W([[8, 1200, [0, 4, 0, 4]], [4, 600, [0, 0, 4, 0]], [6, 900, [0, 4, 2, 0]], [12, 1800, [4, 4, 4, 0]]]), [{ tag: '#s', name: 's' }]).rows[0];
+  assert.equal(sub.days, 8); assert.equal(sub.partialWeeks, 4);
+  assert.equal(Math.round(sub.decks160), 150); // 30 de 32 posibles en los 8 días jugados
+  assert.equal(Math.round(sub.medalsPerWeek), 2250);
+});
+
+test('expulsión: un día a 0 cuenta como fallo solo si consta que era miembro', () => {
+  const W = (rows) => CWSim.prepareHistory(rows.map((x, i) => ({ medals: 1, createdDate: `202609${String(20 - i).padStart(2, '0')}T095000.000Z`, players: [['#m', x[0], x[1], x[2], x[3]]] })));
+  const m = [{ tag: '#m', name: 'm' }];
+  const four = (mem) => [[12, 1800, [4, 4, 0, 4], mem], [12, 1800, [4, 4, 0, 4], mem], [12, 1800, [4, 4, 0, 4], mem], [12, 1800, [4, 4, 0, 4], mem]];
+  // Era miembro los 4 días: el día a 0 es un fallo
+  assert.equal(Math.round(CWSim.kickReport(W(four([1, 1, 1, 1])), m).rows[0].decks160), 120);
+  // No era miembro ese día (o no consta): no cuenta
+  assert.equal(Math.round(CWSim.kickReport(W(four([1, 1, 0, 1])), m).rows[0].decks160), 160);
+  assert.equal(Math.round(CWSim.kickReport(W(four(undefined)), m).rows[0].decks160), 160);
 });

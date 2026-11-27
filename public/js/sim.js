@@ -586,7 +586,7 @@
   //                                  menos de 2.200 → −0,25 y −0,25 por cada 100 de menos (2.100 = −0,5 · 2.000 = −0,75)
   //  · Mazos (sobre 160 = 16 por semana × 10): 156 o más → +2 · de 148 a 155 → +0,5 · menos de 148 → −0,2 por cada mazo
   //                                  que falte hasta 148 (140 = −1,6)
-  // Con menos semanas se escala a 160 (la parte jugada de los mazos posibles × 160).
+  // Solo cuentan los días en que participó (1+ mazos); se escala a 160 con los mazos posibles de esos días.
   // Cuentan las semanas en el clan y, si no estaba, las que haya registradas en otro clan (opts.away).
   // Expulsar por debajo de −0,5; vigilar de −0,5 a +0,5; bien desde +0,5. Hacen falta 4 semanas con datos.
   const KICK = { watchMargin: 1, minWeeks: 4, medalTarget: 2400, threshold: -0.5, deckMax: 160 };
@@ -656,44 +656,29 @@
       }
     };
     const used = weeks.slice(0, nWeeks);
-    const memberSet = new Set(members.map((m) => m.tag));
-    const playedIn = (wk, tag) => !!(wk && (wk.players || []).some((x) => x[0] === tag));
-    used.forEach((w, j) => {
+    // Solo cuentan los días en que participó (1 mazo o más): una semana a 0 no cuenta (no fue partícipe: estaba
+    // fuera del clan o no le tocaba), y un sustituto que entra a jugar algún día cuenta solo esos días.
+    // Lo que sí penaliza es dejarse mazos un día en que jugó (p. ej. 2 de 4) y, desde que se registra quién es
+    // miembro cada día, un día a 0 estando en el clan.
+    used.forEach((w) => {
       const seen = new Set();
       const key = weekKeyOf(w.createdDate);
-      const older = weeks[j + 1];        // semana anterior (si la hay en el historial)
-      const newer = j > 0 ? weeks[j - 1] : null;
       for (const pl of w.players || []) {
-        const [tag, decks, fame, exact] = pl;
+        const [tag, decks, fame, exact, mem] = pl;
         seen.add(tag);
         // Si esa semana jugó también en otro clan (se cambió a mitad de semana), se suma lo de allí
         const a = away[tag] && key ? away[tag][key] : null;
         const r = statOf(tag);
-        let days;
-        let isExact = false;
-        let medals = fame || 0;
-        if (Array.isArray(exact)) {
-          // Días reales del registro; null = no estaba en el clan ese día (no cuenta)
-          days = exact.slice(0, w.days).filter((v) => v != null);
-          isExact = true;
-          if (a) { days = days.concat(splitWeek(a[0], Math.max(1, Math.ceil(a[0] / 4)))); medals += a[1] || 0; }
-          if (!days.length) { r.skipped += 1; continue; }
-        } else {
-          const d = (decks || 0) + (a ? a[0] || 0 : 0);
-          medals += a ? a[1] || 0 : 0;
-          // Sin registro diario no se sabe qué días era miembro:
-          // · llegó esa semana (no estaba la anterior) o vino de otro clan → solo cuentan los días que jugó
-          // · 0 mazos: solo cuenta si estaba antes y siguió después; si no, estaba fuera o de paso
-          const joined = !!older && !playedIn(older, tag);
-          if (!d && !medals) {
-            const stays = j === 0 ? memberSet.has(tag) : playedIn(newer, tag);
-            if (joined || !stays) { r.skipped += 1; continue; }
-          }
-          if (joined || a) { days = splitWeek(d, Math.max(1, Math.ceil(d / 4))); r.partial += 1; }
-          else days = splitWeek(d, w.days);
-        }
+        const isExact = Array.isArray(exact);
+        // Un día a 0 solo cuenta (como fallo) si consta que ese día era miembro del clan
+        let days = isExact
+          ? exact.slice(0, w.days).map((v, i) => (v == null ? null : v > 0 ? v : Array.isArray(mem) && mem[i] === 1 ? 0 : null)).filter((v) => v != null)
+          : splitWeek(decks, w.days).filter((v) => v > 0);
+        if (a && a[0] > 0) days = days.concat(splitWeek(a[0], Math.ceil(a[0] / 4)));
+        if (!days.length) { r.skipped += 1; continue; }
+        if (days.length < w.days) r.partial += 1;
         r.weeks += 1;
-        r.medals += medals;
+        r.medals += (fame || 0) + (a ? a[1] || 0 : 0);
         if (a && a[2]) r.clans.add(a[2]);
         addDays(r, days, isExact);
       }
@@ -701,13 +686,13 @@
       for (const m of members) {
         if (seen.has(m.tag)) continue;
         const a = away[m.tag] && key ? away[m.tag][key] : null;
-        if (!a) continue;
+        if (!a || !(a[0] > 0)) continue;
         const r = statOf(m.tag);
         r.weeks += 1;
         r.awayWeeks += 1;
         r.medals += a[1] || 0;
         if (a[2]) r.clans.add(a[2]);
-        addDays(r, splitWeek(a[0], 4), false);
+        addDays(r, splitWeek(a[0], 4).filter((v) => v > 0), false);
       }
     });
 

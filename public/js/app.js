@@ -963,8 +963,8 @@ function renderKick() {
     const v = VERDICT[r.verdict];
     const est = r.exactShare != null && r.exactShare < 1 ? ` · ${r.exactShare === 0 ? 'estimado' : `${pct(1 - r.exactShare)} estimado`}` : '';
     const awayTxt = r.awayWeeks ? ` · ${r.awayWeeks} en otro clan${r.awayClans && r.awayClans.length ? ` (${r.awayClans.join(', ')})` : ''}` : '';
-    const outTxt = r.skippedWeeks ? ` · ${r.skippedWeeks} sin contar (fuera del clan)` : '';
-    const partTxt = r.partialWeeks ? ` · ${r.partialWeeks} de llegada (solo sus días)` : '';
+    const outTxt = r.skippedWeeks ? ` · ${r.skippedWeeks} sin participar (no cuentan)` : '';
+    const partTxt = r.partialWeeks ? ` · ${r.partialWeeks} jugando solo algunos días (cuentan esos días)` : '';
     const tip = `${r.weeks} ${r.weeks === 1 ? 'semana' : 'semanas'} con datos${awayTxt}${partTxt}${outTxt}${est}`;
     const scoreTip = r.score == null ? 'pocos datos' : `medallas ${sdec(r.medalScore)} + mazos ${sdec(r.deckScore)}`;
     const pdf = ownPdf ? `<a class="kpdf" href="api/player.pdf?${esc(kickQuery(r.tag))}" target="_blank" rel="noopener" title="Ficha PDF de ${esc(r.name)}" aria-label="Ficha PDF de ${esc(r.name)}"><svg class="ic"><use href="#i-download"/></svg></a>` : '';
@@ -982,7 +982,7 @@ function renderKick() {
   const open = new Set([...$('kList').querySelectorAll('details.kmore[open]')].map((d) => d.dataset.k));
   $('kList').innerHTML = (flagged.length ? flagged.map(row).join('') : '<p class="rempty">Nadie por debajo de la nota ni en zona de vigilancia.</p>')
     + (fine.length ? `<details class="kmore" data-k="bien"${open.has('bien') ? ' open' : ''}><summary>Ver los ${fine.length} que están bien</summary>${fine.map(row).join('')}</details>` : '')
-    + (fresh.length ? `<details class="kmore" data-k="nuevo"${open.has('nuevo') ? ' open' : ''}><summary>Sin evaluar: ${fresh.length} con pocos datos</summary>${fresh.map(row).join('')}</details>` : '');
+    + (fresh.length ? `<details class="kmore" data-k="nuevo"${open.has('nuevo') ? ' open' : ''}><summary>Sin evaluar: ${fresh.length} con menos de ${Sim.KICK.minWeeks} semanas participando</summary>${fresh.map(row).join('')}</details>` : '');
 
   const notes = [`Se tienen en cuenta las ${nW === 1 ? 'última semana' : `${nW} últimas semanas`} ya terminadas; la semana en curso cuenta cuando acaba.`];
   if (rep.exactWeeks < rep.weeksUsed) {
@@ -993,7 +993,7 @@ function renderKick() {
     notes.push('Todas las semanas usan los mazos reales de cada día (registro diario).');
   }
   if (entry && entry.daily && entry.daily.since) notes.push(`Registro diario activo desde el ${new Date(entry.daily.since).toLocaleDateString('es-ES')}.`);
-  notes.push('Las semanas en que un miembro aún no estaba en el clan cuentan si hay registro de él en otro clan (índice de guerra del monitor o RoyaleAPI). Los mazos se escalan a 160 con las semanas que tenga, y las medallas son la media por semana de 4 días.');
+  notes.push('Solo cuentan los días en que cada miembro participó (1 mazo o más): las semanas a 0 no cuentan y un sustituto se evalúa por los días que jugó. Las semanas en que aún no estaba en el clan cuentan si hay registro de él en otro clan. Los mazos se escalan a 160 y las medallas son la media por semana de 4 días.');
   notes.push(`Quien tenga menos de ${Sim.KICK.minWeeks} semanas con datos sale como «sin evaluar» (no hay datos suficientes). Si un clan cruzó la meta antes del último día, esos días no cuentan.`);
   $('kNotes').innerHTML = notes.map((x) => `<li>${esc(x)}</li>`).join('');
 }
@@ -1333,7 +1333,7 @@ async function runRecruit(more) {
   const key = recruitQuery();
   if (!more || recruit.key !== key) { recruit.players = []; recruit.data = null; }
   const offset = more && recruit.data ? recruit.data.nextOffset : 0;
-  recruit.busy = true; $('rRun').disabled = true; $('rMore').disabled = true;
+  recruit.busy = true; $('rMore').disabled = true;
   $('rState').textContent = more ? 'Buscando 10 más…' : 'Buscando jugadores… se comprueba el perfil y el historial de cada uno (puede tardar unos segundos).';
   if (!more) $('rList').innerHTML = '<div class="rskel"></div><div class="rskel"></div><div class="rskel"></div>';
   else $('rList').insertAdjacentHTML('beforeend', '<div class="rskel" data-tmp></div><div class="rskel" data-tmp></div>');
@@ -1347,7 +1347,8 @@ async function runRecruit(more) {
     $('rList').querySelectorAll('[data-tmp]').forEach((x) => x.remove());
     if (!more) $('rList').innerHTML = '';
   } finally {
-    recruit.busy = false; $('rRun').disabled = false; $('rMore').disabled = false;
+    recruit.busy = false; $('rMore').disabled = !(recruit.data && recruit.data.more);
+    if (recruit.key !== recruitQuery()) runRecruit(false); // los filtros cambiaron mientras buscaba
   }
 }
 function recruitCard(p, i) {
@@ -1380,7 +1381,8 @@ function renderRecruit(d, more) {
   $('rList').querySelectorAll('[data-tmp]').forEach((x) => x.remove());
   if (more) $('rList').insertAdjacentHTML('beforeend', d.players.map((p, i) => recruitCard(p, i)).join(''));
   else $('rList').innerHTML = d.players.map((p, i) => recruitCard(p, i)).join('');
-  $('rMore').hidden = !d.more;
+  $('rMore').hidden = false;
+  $('rMore').title = d.more ? 'Revisar otros jugadores' : 'No quedan más jugadores por revisar';
 }
 // «Abrir en el juego»: en el móvil se abre la app directamente (clashroyale://); si no se abre en 1,5 s,
 // la página oficial de Supercell (link.clashroyale.com), que también lleva al perfil
@@ -1395,7 +1397,10 @@ $('rList').addEventListener('click', (e) => {
   window.location.href = a.dataset.app;
   setTimeout(() => { document.removeEventListener('visibilitychange', onHide); if (!left && !document.hidden) window.location.href = web; }, 1500);
 });
-$('rForm').addEventListener('submit', (e) => { e.preventDefault(); runRecruit(false); });
+$('rForm').addEventListener('submit', (e) => e.preventDefault());
+// Al cambiar el país o soltar la nota mínima se busca de nuevo (no hay botón «Buscar»)
+$('rCountry').addEventListener('change', () => runRecruit(false));
+$('rMin').addEventListener('change', () => runRecruit(false));
 $('rMore').addEventListener('click', () => runRecruit(true));
 $('rMin').addEventListener('input', recruitControls);
 $('rCopy').addEventListener('click', async () => {

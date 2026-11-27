@@ -19,7 +19,8 @@ function makeHistory() {
       if (m.name === 'KING KILLER') medals = i < 4 ? 3400 : 2800;      // mejora
       if (m.name === 'Ivanius2005') medals = i < 4 ? 2000 : 2900;      // empeora
       if (m.name === 'lucho') { decks = 4; medals = 600; }             // se deja casi todo
-      players.push([m.tag, decks, medals]);
+      // lucho: miembro todos los días, 1 mazo al día (se deja 3 de 4 cada día)
+      players.push(m.name === 'lucho' ? [m.tag, decks, medals, [1, 1, 1, 1], [1, 1, 1, 1]] : [m.tag, decks, medals]);
     });
     weeks.push({ createdDate: new Date(Date.UTC(2026, 9, 19) - i * 7 * 86400e3).toISOString().replace(/[-:]/g, '').replace(/\.\d+Z$/, '.000Z'), seasonId: 137 - Math.floor((i + 2) / 4), sectionIndex: (3 - ((i + 2) % 4) + 4) % 4, colosseum: false, medals: 120000, rank: 2, finishTime: '19691231T235959.000Z', names, players });
   }

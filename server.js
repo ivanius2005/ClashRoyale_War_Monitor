@@ -944,7 +944,7 @@ async function route(req, res) {
     const opts = {
       country: q.get('country') === 'any' ? 'any' : 'home',
       minScore: Math.round(num(q.get('min'), -2, 4, 1) * 4) / 4,
-      noClan: q.get('noclan') !== '0',
+      noClan: true, // siempre sin clan: nadie deja su clan para venir al nuestro
       offset: Math.round(num(q.get('offset'), 0, 200000, 0)),
     };
     return json(req, res, 200, await getRecruits(opts));

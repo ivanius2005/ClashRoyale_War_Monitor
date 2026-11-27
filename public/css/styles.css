@@ -964,9 +964,10 @@ body{font:15px/1.55 var(--sans);color:var(--text);letter-spacing:-.005em;
 @keyframes shimmer{from{background-position:200% 0}to{background-position:-200% 0}}
 .rctl{grid-template-columns:repeat(3,minmax(0,1fr))}
 .rctl .kc-goal{grid-column:auto}
-.rmore{display:flex;justify-content:center;margin-top:14px}
-.go.ghost{background:transparent;color:var(--green);border:1px solid var(--green);box-shadow:none}
-.go.ghost:hover{background:rgba(57,255,20,.1)}
+.kc-acts{flex-direction:column!important;justify-content:center;align-items:stretch;gap:8px}
+.kc-acts .go{flex:none;width:100%;margin:0}
+.go.outline{background:transparent;color:var(--green);border:1px solid var(--green);box-shadow:none}
+.go.outline:hover{background:rgba(57,255,20,.1)}
 @media (max-width:900px){.kctl{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (max-width:760px){
   .tabs button{font-size:11px;padding:7px 1px;gap:3px;min-width:0}

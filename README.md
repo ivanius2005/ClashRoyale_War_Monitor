@@ -31,10 +31,10 @@ Busca cualquier clan por su nombre o por su tag. La web tiene cuatro pestañas.
 
 **Reclutamiento** (solo el clan de casa)
 - Busca en el índice de guerra jugadores activos (jugaron la última guerra con 2.000+ medallas) con buena nota según los criterios del clan (por defecto ≥ +1), del país del clan
-  (la mitad o más de sus semanas en clanes del ranking de guerra de ese país) y sin clan, de 10 en 10 («Cargar 10 más»).
+  (la mitad o más de sus semanas en clanes del ranking de guerra de ese país) y sin clan (siempre), de 10 en 10 («Buscar más»).
   La nota es la misma que la de su ficha (/p/TAG).
 - Cada uno con su ficha, su tag y un enlace que abre su perfil en el juego (`link.clashroyale.com`) para invitarle.
-  Ruta: `GET /api/recruit?country=home|any&min=1&noclan=1&offset=0`.
+  Ruta: `GET /api/recruit?country=home|any&min=1&offset=0`.
 
 **04 · Simulación de la semana (Monte Carlo)**
 - Probabilidad de quedar 1º, 2º… 5º y el puesto esperado de cada clan.

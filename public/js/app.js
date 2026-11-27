@@ -1309,7 +1309,7 @@ function saveSeen(tag, full) {
 const recruit = { busy: false, data: null, key: null, players: [], countryName: null };
 function recruitQuery() {
   return new URLSearchParams({
-    country: $('rCountry').value === 'any' ? 'any' : 'home', min: $('rMin').value, noclan: $('rNoClan').checked ? '1' : '0',
+    country: $('rCountry').value === 'any' ? 'any' : 'home', min: $('rMin').value, // siempre jugadores sin clan
   }).toString();
 }
 function recruitControls() {
@@ -1375,7 +1375,7 @@ function renderRecruit(d, more) {
   const n = recruit.players.length;
   $('rState').textContent = n
     ? `${n} ${n === 1 ? 'jugador cumple' : 'jugadores cumplen'} los criterios${d.more ? '' : ' (no hay más)'}.`
-    : d.more ? 'Ninguno de los primeros revisados cumple los criterios: pulsa «Cargar 10 más» para seguir buscando.'
+    : d.more ? 'Ninguno de los primeros revisados cumple los criterios: pulsa «Buscar más» para seguir buscando.'
       : 'Nadie cumple ahora mismo los criterios. Prueba a bajar la nota.';
   $('rList').querySelectorAll('[data-tmp]').forEach((x) => x.remove());
   if (more) $('rList').insertAdjacentHTML('beforeend', d.players.map((p, i) => recruitCard(p, i)).join(''));

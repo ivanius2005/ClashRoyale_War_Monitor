@@ -30,7 +30,7 @@ Busca cualquier clan por su nombre o por su tag. La web tiene cuatro pestañas.
 - Semanas y nota mínima ajustables; se recuerdan en el navegador. La misma nota decide «apto / no apto» al reclutar (ficha de jugador).
 
 **Reclutamiento** (solo el clan de casa)
-- Busca en el índice de guerra jugadores con buena nota según los criterios del clan (por defecto ≥ +1), del país del clan
+- Busca en el índice de guerra jugadores activos (jugaron la última guerra con 2.000+ medallas) con buena nota según los criterios del clan (por defecto ≥ +1), del país del clan
   (la mitad o más de sus semanas en clanes del ranking de guerra de ese país) y sin clan, de 10 en 10 («Cargar 10 más»).
   La nota es la misma que la de su ficha (/p/TAG).
 - Cada uno con su ficha, su tag y un enlace que abre su perfil en el juego (`link.clashroyale.com`) para invitarle.
@@ -85,6 +85,9 @@ Nota = puntos de medallas + puntos de mazos
 | menos de 148 | −0,2 por cada mazo que falte hasta 148 (140 = −1,6) |
 
 Con menos semanas, los mazos se escalan a 160 y las medallas son la media por semana de 4 días de guerra.
+Para no dar métricas falsas: con registro diario solo cuentan los días en que era miembro; sin él, la semana en que
+llegó (no estaba la anterior) o en que se cambió de clan solo cuenta los días que jugó, y una semana a 0 solo cuenta
+si estaba la semana anterior y siguió después (si no, estaba fuera o de paso).
 Por debajo de −0,5: expulsar (no apto); de −0,5 a +0,5: vigilar (a revisar); desde +0,5: bien (apto). Quien
 tenga menos de 4 semanas con datos sale como «sin evaluar» (no hay datos suficientes).
 

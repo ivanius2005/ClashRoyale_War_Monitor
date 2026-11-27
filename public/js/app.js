@@ -963,7 +963,9 @@ function renderKick() {
     const v = VERDICT[r.verdict];
     const est = r.exactShare != null && r.exactShare < 1 ? ` · ${r.exactShare === 0 ? 'estimado' : `${pct(1 - r.exactShare)} estimado`}` : '';
     const awayTxt = r.awayWeeks ? ` · ${r.awayWeeks} en otro clan${r.awayClans && r.awayClans.length ? ` (${r.awayClans.join(', ')})` : ''}` : '';
-    const tip = `${r.weeks} ${r.weeks === 1 ? 'semana' : 'semanas'} con datos${awayTxt}${est}`;
+    const outTxt = r.skippedWeeks ? ` · ${r.skippedWeeks} sin contar (fuera del clan)` : '';
+    const partTxt = r.partialWeeks ? ` · ${r.partialWeeks} de llegada (solo sus días)` : '';
+    const tip = `${r.weeks} ${r.weeks === 1 ? 'semana' : 'semanas'} con datos${awayTxt}${partTxt}${outTxt}${est}`;
     const scoreTip = r.score == null ? 'pocos datos' : `medallas ${sdec(r.medalScore)} + mazos ${sdec(r.deckScore)}`;
     const pdf = ownPdf ? `<a class="kpdf" href="api/player.pdf?${esc(kickQuery(r.tag))}" target="_blank" rel="noopener" title="Ficha PDF de ${esc(r.name)}" aria-label="Ficha PDF de ${esc(r.name)}"><svg class="ic"><use href="#i-download"/></svg></a>` : '';
     return `<div class="krow v-${r.verdict}">
@@ -1351,7 +1353,7 @@ async function runRecruit(more) {
 function recruitCard(p, i) {
   const bare = String(p.tag).replace('#', '');
   const game = `https://link.clashroyale.com/es/?playerInfo?id=${encodeURIComponent(bare)}`;
-  const meta = [`<span class="rtag">${esc(p.tag)}</span>`, p.trophies != null ? `${fmt(p.trophies)} copas` : '', p.lastClan && p.lastClan.name ? `último clan: ${esc(p.lastClan.name)}` : '', p.clan ? `ahora en ${esc(p.clan.name)}` : 'sin clan']
+  const meta = [`<span class="rtag">${esc(p.tag)}</span>`, p.lastWeek ? `última guerra: ${fmt(p.lastWeek.medals)} medallas` : '', p.lastClan && p.lastClan.name ? `en ${esc(p.lastClan.name)}` : '', p.clan ? `ahora en ${esc(p.clan.name)}` : 'sin clan']
     .filter(Boolean).join(' · ');
   return `<div class="rcard" style="--i:${i % 10}">
     <span class="rlv" title="Nivel de rey">${p.expLevel || '—'}</span>
@@ -1359,7 +1361,7 @@ function recruitCard(p, i) {
     <div class="rstat" title="Medallas ${sdec(p.medalScore)} + mazos ${sdec(p.deckScore)} · ${p.weeks} semanas con datos"><b>${sdec(p.score)}</b>${fmt(p.medalsPerWeek)} med./sem. · ${Math.round(p.decks160)}/160</div>
     <div class="racts">
       <a class="rbtn" href="/p/${esc(bare)}"><svg class="ic"><use href="#i-users"/></svg>Perfil</a>
-      <a class="rbtn game" href="${esc(game)}" target="_blank" rel="noopener"><svg class="ic"><use href="#i-link"/></svg>Abrir en el juego</a>
+      <a class="rbtn game" href="${esc(game)}" data-app="clashroyale://playerInfo?id=${esc(encodeURIComponent(bare))}" target="_blank" rel="noopener"><svg class="ic"><use href="#i-link"/></svg>Abrir en el juego</a>
     </div>
   </div>`;
 }
@@ -1380,6 +1382,19 @@ function renderRecruit(d, more) {
   else $('rList').innerHTML = d.players.map((p, i) => recruitCard(p, i)).join('');
   $('rMore').hidden = !d.more;
 }
+// «Abrir en el juego»: en el móvil se abre la app directamente (clashroyale://); si no se abre en 1,5 s,
+// la página oficial de Supercell (link.clashroyale.com), que también lleva al perfil
+$('rList').addEventListener('click', (e) => {
+  const a = e.target.closest('a.rbtn.game');
+  if (!a || !/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) return;
+  e.preventDefault();
+  const web = a.href;
+  let left = false;
+  const onHide = () => { left = true; };
+  document.addEventListener('visibilitychange', onHide, { once: true });
+  window.location.href = a.dataset.app;
+  setTimeout(() => { document.removeEventListener('visibilitychange', onHide); if (!left && !document.hidden) window.location.href = web; }, 1500);
+});
 $('rForm').addEventListener('submit', (e) => { e.preventDefault(); runRecruit(false); });
 $('rMore').addEventListener('click', () => runRecruit(true));
 $('rMin').addEventListener('input', recruitControls);

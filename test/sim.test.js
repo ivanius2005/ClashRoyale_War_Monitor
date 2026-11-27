@@ -341,3 +341,27 @@ test('run: dos clanes que cruzan la meta el mismo día comparten el 1º', () => 
     assert.equal(c.pWinAlone, 0);
   }
 });
+
+test('expulsión: la semana de llegada solo cuenta los días que jugó', () => {
+  // De la más reciente a la más antigua: llegó en la 4ª semana (8 mazos) y antes no estaba
+  const raw = [[16, 2400], [16, 2400], [16, 2400], [8, 1200], null].map((x, i) => ({
+    medals: 1, createdDate: `202609${String(20 - i).padStart(2, '0')}T095000.000Z`, players: x ? [['#a', x[0], x[1]]] : [['#otro', 16, 2000]],
+  }));
+  const row = CWSim.kickReport(CWSim.prepareHistory(raw), [{ tag: '#a', name: 'a' }]).rows[0];
+  assert.equal(row.partialWeeks, 1);
+  assert.equal(Math.round(row.decks160), 160); // sin penalización por los días antes de llegar
+  assert.equal(row.verdict, 'bien');
+});
+
+test('expulsión: una semana a 0 sin estar antes no cuenta; entre dos semanas jugadas sí', () => {
+  const mk = (rows) => CWSim.prepareHistory(rows.map((x, i) => ({
+    medals: 1, createdDate: `202609${String(20 - i).padStart(2, '0')}T095000.000Z`, players: x ? [['#a', x[0], x[1]]] : [['#otro', 16, 2000]],
+  })));
+  const m = [{ tag: '#a', name: 'a' }];
+  // 0 en su primera aparición (estaba fuera / de paso): no cuenta
+  const fuera = CWSim.kickReport(mk([[16, 2400], [16, 2400], [16, 2400], [16, 2400], [0, 0], null]), m).rows[0];
+  assert.equal(fuera.skippedWeeks, 1); assert.equal(fuera.weeks, 4); assert.equal(Math.round(fuera.decks160), 160);
+  // 0 entre semanas jugadas en el clan: sí cuenta (no jugó estando dentro)
+  const dentro = CWSim.kickReport(mk([[16, 2400], [16, 2400], [0, 0], [16, 2400], [16, 2400]]), m).rows[0];
+  assert.equal(dentro.skippedWeeks, 0); assert.equal(dentro.weeks, 5); assert.equal(Math.round(dentro.decks160), 128);
+});

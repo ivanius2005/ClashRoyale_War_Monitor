@@ -643,7 +643,7 @@
     const stats = new Map();
     const statOf = (tag) => {
       let r = stats.get(tag);
-      if (!r) stats.set(tag, (r = { weeks: 0, days: 0, counts: [0, 0, 0, 0, 0], decks: 0, medals: 0, exactDays: 0, awayWeeks: 0, clans: new Set() }));
+      if (!r) stats.set(tag, (r = { weeks: 0, days: 0, counts: [0, 0, 0, 0, 0], decks: 0, medals: 0, exactDays: 0, awayWeeks: 0, skipped: 0, partial: 0, clans: new Set() }));
       return r;
     };
     const addDays = (r, days, exact) => {
@@ -656,27 +656,48 @@
       }
     };
     const used = weeks.slice(0, nWeeks);
-    for (const w of used) {
+    const memberSet = new Set(members.map((m) => m.tag));
+    const playedIn = (wk, tag) => !!(wk && (wk.players || []).some((x) => x[0] === tag));
+    used.forEach((w, j) => {
       const seen = new Set();
+      const key = weekKeyOf(w.createdDate);
+      const older = weeks[j + 1];        // semana anterior (si la hay en el historial)
+      const newer = j > 0 ? weeks[j - 1] : null;
       for (const pl of w.players || []) {
         const [tag, decks, fame, exact] = pl;
+        seen.add(tag);
+        // Si esa semana jugó también en otro clan (se cambió a mitad de semana), se suma lo de allí
+        const a = away[tag] && key ? away[tag][key] : null;
+        const r = statOf(tag);
         let days;
         let isExact = false;
+        let medals = fame || 0;
         if (Array.isArray(exact)) {
-          // Días reales del registro; null = aún no estaba en el clan ese día
+          // Días reales del registro; null = no estaba en el clan ese día (no cuenta)
           days = exact.slice(0, w.days).filter((v) => v != null);
           isExact = true;
+          if (a) { days = days.concat(splitWeek(a[0], Math.max(1, Math.ceil(a[0] / 4)))); medals += a[1] || 0; }
+          if (!days.length) { r.skipped += 1; continue; }
         } else {
-          days = splitWeek(decks, w.days);
+          const d = (decks || 0) + (a ? a[0] || 0 : 0);
+          medals += a ? a[1] || 0 : 0;
+          // Sin registro diario no se sabe qué días era miembro:
+          // · llegó esa semana (no estaba la anterior) o vino de otro clan → solo cuentan los días que jugó
+          // · 0 mazos: solo cuenta si estaba antes y siguió después; si no, estaba fuera o de paso
+          const joined = !!older && !playedIn(older, tag);
+          if (!d && !medals) {
+            const stays = j === 0 ? memberSet.has(tag) : playedIn(newer, tag);
+            if (joined || !stays) { r.skipped += 1; continue; }
+          }
+          if (joined || a) { days = splitWeek(d, Math.max(1, Math.ceil(d / 4))); r.partial += 1; }
+          else days = splitWeek(d, w.days);
         }
-        const r = statOf(tag);
         r.weeks += 1;
-        r.medals += fame || 0;
+        r.medals += medals;
+        if (a && a[2]) r.clans.add(a[2]);
         addDays(r, days, isExact);
-        seen.add(tag);
       }
       // Semanas en otro clan (índice de guerra o RoyaleAPI) de los miembros actuales que no estaban en este
-      const key = weekKeyOf(w.createdDate);
       for (const m of members) {
         if (seen.has(m.tag)) continue;
         const a = away[m.tag] && key ? away[m.tag][key] : null;
@@ -688,11 +709,11 @@
         if (a[2]) r.clans.add(a[2]);
         addDays(r, splitWeek(a[0], 4), false);
       }
-    }
+    });
 
     const rows = members.map((m) => {
       const r = stats.get(m.tag);
-      const base = { tag: m.tag, name: m.name, weeks: r ? r.weeks : 0, days: r ? r.days : 0, counts: r ? r.counts : [0, 0, 0, 0, 0], awayWeeks: r ? r.awayWeeks : 0 };
+      const base = { tag: m.tag, name: m.name, weeks: r ? r.weeks : 0, days: r ? r.days : 0, counts: r ? r.counts : [0, 0, 0, 0, 0], awayWeeks: r ? r.awayWeeks : 0, skippedWeeks: r ? r.skipped : 0, partialWeeks: r ? r.partial : 0 };
       if (!r || r.weeks < minWeeks || !r.days) return Object.assign(base, { verdict: 'nuevo', score: null });
       const possible = r.days * RULES.decksPerDay;
       const decks160 = (r.decks / possible) * KICK.deckMax;      // mazos jugados escalados a 160

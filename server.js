@@ -387,6 +387,8 @@ function homeCountry() {
 function playerBasic(tag) {
   return cached(`pbasic:${tag}`, 30 * 60e3, () => cr(`/players/%23${tag}`));
 }
+// Activo = jugó la última guerra (la semana cerrada más reciente) e hizo al menos 2.000 medallas
+const RECRUIT_MIN_LAST = 2000;
 function recruitCandidates(minScore, countryClans) {
   const keys = lastWeekKeys(10);
   const keySet = new Set(keys);
@@ -394,17 +396,18 @@ function recruitCandidates(minScore, countryClans) {
   const out = [];
   for (const [tag, e] of Object.entries(warIndex.players)) {
     if (!e || !e[1]) continue;
-    let weeks = 0, decks = 0, medals = 0, inCountry = 0, last = null, lastCi = -1, mapped = 0;
+    let weeks = 0, decks = 0, medals = 0, inCountry = 0, last = null, lastCi = -1, lastDecks = 0, lastMedals = 0, mapped = 0;
     for (const r of e[1].split(';')) {
       const k = r.slice(0, 10);
       if (!keySet.has(k)) continue;
       const [, ci, d, f] = r.split(',');
       weeks += 1; decks += +d; medals += +f;
       if (countryClans) { const c = warIndex.clans[+ci]; if (c && countryClans.has(c[0])) inCountry += 1; }
-      if (!last || k > last) { last = k; lastCi = +ci; }
+      if (!last || k > last) { last = k; lastCi = +ci; lastDecks = +d; lastMedals = +f; }
       mapped += 1;
     }
     if (weeks < CWSim.KICK.minWeeks) continue;
+    if (last !== newest || lastMedals < RECRUIT_MIN_LAST || !lastDecks) continue; // activo: jugó la última guerra con 2.000+
     if (countryClans && inCountry * 2 < weeks) continue;
     const medalsPerWeek = medals / weeks;
     const decks160 = (decks / (weeks * 16)) * CWSim.KICK.deckMax;
@@ -415,8 +418,7 @@ function recruitCandidates(minScore, countryClans) {
     const c = warIndex.clans[lastCi] || [];
     out.push({ tag, weeks, medalsPerWeek, decks160, medalScore, deckScore, score, lastWeek: last, lastClan: { tag: c[0] || null, name: c[1] || null }, stillThere: last === newest });
   }
-  // Primero quien ya no jugó la última semana (lo más probable es que esté sin clan); luego por nota
-  out.sort((a, b) => (a.stillThere - b.stillThere) || (b.score - a.score));
+  out.sort((a, b) => b.score - a.score);
   return out;
 }
 // Lista ordenada de candidatos (barata: solo el índice). Se calcula una vez cada 20 minutos.
@@ -448,12 +450,15 @@ function getRecruits({ country, minScore, noClan, offset }) {
         const war = await getPlayerWar(bare).catch(() => null);
         const e = war && war.evaluation;
         if (!e || e.score == null || e.verdict === 'nuevo' || e.score < minScore) return null;
-        const lastKnown = (war.weeks || []).find((w) => w.known) || null;
+        const lw = (war.weeks || [])[0]; // la última guerra cerrada
+        if (!lw || !lw.known || !(lw.decks > 0) || (lw.medals || 0) < RECRUIT_MIN_LAST) return null;
+        const lastKnown = lw;
         return {
           tag: p.tag, name: p.name, expLevel: p.expLevel, trophies: p.trophies, arena: p.arena ? p.arena.name : null,
           clan: p.clan ? { tag: p.clan.tag, name: p.clan.name } : null,
           score: e.score, medalScore: e.medalScore, deckScore: e.deckScore, medalsPerWeek: e.medalsPerWeek, decks160: e.decks160,
           weeks: e.weeks, apt: e.apt, lastClan: lastKnown && lastKnown.clan ? lastKnown.clan : c.lastClan,
+          lastWeek: { decks: lw.decks, medals: lw.medals },
         };
       }));
       res.forEach((r) => { if (r) found.push(r); });
@@ -567,14 +572,14 @@ function reduceRaceLog(items, tag, currentSectionIndex, withNames) {
 }
 
 // Semanas que los miembros actuales de un clan jugaron en OTRO clan (índice de guerra o RoyaleAPI), para las semanas
-// del historial en que no estaban en este: { '#TAG': { '2026-10-19': [mazos, medallas, nombre del clan] } }
+// del historial en que no estaban en este o en que se cambiaron de clan a mitad de semana: { '#TAG': { '2026-10-19': [mazos, medallas, nombre del clan] } }
 function awayWeeks(weeks, roster, clanTag) {
   const out = {};
   for (const m of roster || []) {
     const idx = warIndex.get(m.tag);
     const imp = warIndex.getImported(m.tag);
     for (const w of weeks) {
-      if ((w.players || []).some((p) => p[0] === m.tag)) continue;
+      // También las semanas en que sí estaba: si se cambió de clan a mitad de semana, el índice guarda el otro clan
       const k = weekKey(w.createdDate);
       const o = idx[k];
       const r = imp[k];
